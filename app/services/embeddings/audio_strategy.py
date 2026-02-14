@@ -100,10 +100,13 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
             target_sr = 16000
             if sample_rate != target_sr:
                 import numpy as np
+
                 duration = len(audio_input) / sample_rate
                 num_samples = int(duration * target_sr)
                 indices = np.linspace(0, len(audio_input) - 1, num_samples)
-                audio_input = np.interp(indices, np.arange(len(audio_input)), audio_input)
+                audio_input = np.interp(
+                    indices, np.arange(len(audio_input)), audio_input
+                )
                 sample_rate = target_sr
                 logger.debug(f"Resampled audio to {target_sr}Hz")
 
