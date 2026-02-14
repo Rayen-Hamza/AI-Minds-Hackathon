@@ -10,6 +10,27 @@ dependencies = [
     "python-dotenv",
     "qdrant-client",
     "neo4j",
+    "python-multipart",
+    "sentence-transformers",
+    "transformers",
+    "torch",
+    "pillow",
+    "soundfile",
+    "langchain-text-splitters",
+    "spacy",
+    "pymupdf",
+    "pytesseract",
+    "imagehash",
+    "opencv-python",
+    "python-magic",
+    "aiofiles",
+    "sentencepiece>=0.2.1",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic-settings",
+    "python-dotenv",
+    "qdrant-client",
+    "neo4j",
 ]
 
 [project.optional-dependencies]
@@ -18,3 +39,11 @@ dev = [
     "pytest-asyncio",
     "httpx",
 ]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

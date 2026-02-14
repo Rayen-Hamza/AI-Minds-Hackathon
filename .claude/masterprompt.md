@@ -167,10 +167,6 @@ EmbeddingStrategy (Interface)
 
 **Collections**:
 
-- `text_embeddings`
-- `image_embeddings`
-- `video_embeddings`
-- `audio_embeddings`
 - `multimodal_embeddings`
 
 **Vector Entry Structure**:
