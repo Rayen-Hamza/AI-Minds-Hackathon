@@ -4,10 +4,17 @@ version = "0.1.0"
 description = "AI Minds Hackathon"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "pydantic-settings>=2.5.0",
-    "python-dotenv>=1.0.0",
-    "qdrant-client>=1.12.0",
-    "neo4j>=5.25.0",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic-settings",
+    "python-dotenv",
+    "qdrant-client",
+    "neo4j",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
 ]
