@@ -1,5 +1,5 @@
 """
-Audio processing pipeline using NVIDIA Canary-Qwen for transcription.
+Audio processing pipeline using Whisper for transcription.
 Handles audio transcription, chunking, and entity extraction.
 """
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class AudioProcessor:
     """
     Processes audio files for embedding and storage.
-    Transcribes audio using NVIDIA Canary-Qwen, chunks transcript, and extracts entities.
+    Transcribes audio using Whisper, chunks transcript, and extracts entities.
     """
 
     def __init__(self):
@@ -86,7 +86,7 @@ class AudioProcessor:
 
     def transcribe_audio(self, audio_path: str | Path) -> dict:
         """
-        Transcribe audio file using NVIDIA Canary-Qwen.
+        Transcribe audio file using Whisper.
 
         Args:
             audio_path: Path to audio file
