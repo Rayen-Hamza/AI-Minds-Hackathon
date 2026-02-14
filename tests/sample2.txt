@@ -1,0 +1,14 @@
+Vector Databases and Embeddings
+
+Vector databases are specialized database systems designed to store and query high-dimensional vector embeddings efficiently. These databases have become essential infrastructure for modern AI applications, particularly those involving semantic search, recommendation systems, and retrieval-augmented generation (RAG).
+
+Embeddings are dense numerical representations of data (text, images, audio) that capture semantic meaning in a continuous vector space. Similar items have vectors that are close together in this space, enabling similarity search operations.
+
+Popular vector databases include:
+- Qdrant: Written in Rust, offers high performance and rich filtering
+- Pinecone: Managed service with automatic scaling
+- Weaviate: Open-source with built-in vectorization
+- Milvus: Distributed architecture for large-scale deployments
+- Chroma: Lightweight and developer-friendly
+
+Vector databases typically use algorithms like HNSW (Hierarchical Navigable Small World) or IVF (Inverted File Index) to perform approximate nearest neighbor searches efficiently, even with millions or billions of vectors.
