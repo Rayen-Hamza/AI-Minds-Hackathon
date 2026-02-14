@@ -94,6 +94,9 @@ class ImageEmbeddingStrategy(EmbeddingStrategy):
             1024-dimensional embedding vector
         """
         try:
+            # Ensure model is loaded (triggers lazy loading)
+            _ = self.model
+
             # Load image
             img = self._load_image(content)
 
@@ -126,6 +129,9 @@ class ImageEmbeddingStrategy(EmbeddingStrategy):
         try:
             if not contents:
                 return []
+
+            # Ensure model is loaded (triggers lazy loading)
+            _ = self.model
 
             # Load all images
             images = []

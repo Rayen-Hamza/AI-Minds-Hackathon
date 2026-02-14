@@ -49,11 +49,12 @@ class CaptionEmbeddingStrategy(EmbeddingStrategy):
             logger.debug(f"Loading tokenizer for model: {self.model_name}")
             self._tokenizer = SiglipTokenizer.from_pretrained(self.model_name)
             logger.debug("Tokenizer loaded, now loading image processor...")
-            self._image_processor = SiglipImageProcessor.from_pretrained(self.model_name)
+            self._image_processor = SiglipImageProcessor.from_pretrained(
+                self.model_name
+            )
             logger.debug("Image processor loaded, now loading model...")
             self._model = SiglipModel.from_pretrained(
-                self.model_name,
-                trust_remote_code=False
+                self.model_name, trust_remote_code=False
             ).to(self._device)
             self._model.eval()
 
@@ -114,11 +115,14 @@ class CaptionEmbeddingStrategy(EmbeddingStrategy):
             img = self._load_image(content)
 
             # Process image
-            inputs = self._image_processor(images=img, return_tensors="pt").to(self._device)
+            inputs = self._image_processor(images=img, return_tensors="pt").to(
+                self._device
+            )
 
             # Generate image embedding
             with torch.no_grad():
-                image_features = self._model.get_image_features(**inputs)
+                outputs = self._model.vision_model(**inputs)
+                image_features = outputs.pooler_output
                 # Normalize for similarity search
                 embedding = image_features / image_features.norm(dim=-1, keepdim=True)
                 embedding = embedding.cpu().numpy()[0]
@@ -145,11 +149,14 @@ class CaptionEmbeddingStrategy(EmbeddingStrategy):
             _ = self.model
 
             # Process text
-            inputs = self._tokenizer(text=text, return_tensors="pt", padding="max_length", truncation=True).to(self._device)
+            inputs = self._tokenizer(
+                text=text, return_tensors="pt", padding="max_length", truncation=True
+            ).to(self._device)
 
             # Generate text embedding
             with torch.no_grad():
-                text_features = self._model.get_text_features(**inputs)
+                outputs = self._model.text_model(**inputs)
+                text_features = outputs.pooler_output
                 # Normalize for similarity search
                 embedding = text_features / text_features.norm(dim=-1, keepdim=True)
                 embedding = embedding.cpu().numpy()[0]
@@ -160,6 +167,19 @@ class CaptionEmbeddingStrategy(EmbeddingStrategy):
         except Exception as e:
             logger.error(f"Error generating text embedding for '{text}': {e}")
             raise
+
+    def generate_caption(self, image_path: str | Path) -> str:
+        """
+        Generate a simple text description for an image.
+        SigLIP is not a captioning model, so we return a placeholder.
+
+        Args:
+            image_path: Path to image file
+
+        Returns:
+            Placeholder caption string
+        """
+        return f"Image: {Path(image_path).name}"
 
     def embed_batch(self, contents: list[str | Path]) -> list[list[float]]:
         """
@@ -198,7 +218,8 @@ class CaptionEmbeddingStrategy(EmbeddingStrategy):
 
             # Generate embeddings
             with torch.no_grad():
-                image_features = self._model.get_image_features(**inputs)
+                outputs = self._model.vision_model(**inputs)
+                image_features = outputs.pooler_output
                 # Normalize for similarity search
                 embeddings = image_features / image_features.norm(dim=-1, keepdim=True)
                 embeddings = embeddings.cpu().numpy()

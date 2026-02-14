@@ -43,7 +43,9 @@ class ImageProcessor:
         """Lazy-load caption embedder."""
         if self._caption_embedder is None:
             try:
-                self._caption_embedder = get_caption_embedder(settings.text_to_image_model)
+                self._caption_embedder = get_caption_embedder(
+                    settings.text_to_image_model
+                )
             except Exception as e:
                 logger.warning(f"Failed to load caption embedder: {e}")
                 self._caption_embedder = None
