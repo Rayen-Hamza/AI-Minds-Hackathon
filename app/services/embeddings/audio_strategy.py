@@ -1,6 +1,6 @@
 """
 Audio embedding strategy.
-Transcribes audio using NVIDIA Canary-Qwen 2.5B, then embeds transcript with MiniLM (384-dim).
+Transcribes audio using OpenAI Whisper, then embeds transcript with MiniLM (384-dim).
 """
 
 import logging
@@ -25,14 +25,14 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
 
     def __init__(
         self,
-        model_name: str = "nvidia/canary-qwen-2.5b",
+        model_name: str = "openai/whisper-base",
         text_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     ):
         """
         Initialize audio embedding strategy.
 
         Args:
-            model_name: Canary-Qwen model name
+            model_name: Whisper model name
             text_model: Text embedding model for transcript embedding
         """
         super().__init__(model_name)
@@ -47,9 +47,9 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
             # Detect device
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
             torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-            logger.info(f"Loading Canary-Qwen model on device: {self._device}")
+            logger.info(f"Loading Whisper model on device: {self._device}")
 
-            # Load Canary-Qwen processor and model
+            # Load Whisper processor and model
             self._processor = AutoProcessor.from_pretrained(self.model_name)
             self._model = AutoModelForSpeechSeq2Seq.from_pretrained(
                 self.model_name, torch_dtype=torch_dtype, low_cpu_mem_usage=True
@@ -67,12 +67,12 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
             )
 
         except Exception as e:
-            logger.error(f"Failed to load Canary-Qwen model: {e}")
+            logger.error(f"Failed to load Whisper model: {e}")
             raise
 
     def transcribe(self, audio_path: str | Path) -> dict:
         """
-        Transcribe audio file using Canary-Qwen.
+        Transcribe audio file using Whisper.
 
         Args:
             audio_path: Path to audio file
@@ -81,6 +81,9 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
             Transcription result dict with 'text'
         """
         try:
+            # Ensure model is loaded
+            _ = self.model
+
             audio_path = Path(audio_path)
             if not audio_path.exists():
                 raise FileNotFoundError(f"Audio file not found: {audio_path}")
@@ -89,6 +92,23 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
 
             # Load audio file
             audio_input, sample_rate = sf.read(str(audio_path))
+
+            # Whisper expects 16kHz mono audio — resample if needed
+            if len(audio_input.shape) > 1:
+                audio_input = audio_input.mean(axis=1)  # stereo to mono
+
+            target_sr = 16000
+            if sample_rate != target_sr:
+                import numpy as np
+
+                duration = len(audio_input) / sample_rate
+                num_samples = int(duration * target_sr)
+                indices = np.linspace(0, len(audio_input) - 1, num_samples)
+                audio_input = np.interp(
+                    indices, np.arange(len(audio_input)), audio_input
+                )
+                sample_rate = target_sr
+                logger.debug(f"Resampled audio to {target_sr}Hz")
 
             # Process audio
             inputs = self._processor(
@@ -125,6 +145,9 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
             384-dimensional transcript embedding vector
         """
         try:
+            # Ensure model is loaded
+            _ = self.model
+
             # Transcribe audio
             result = self.transcribe(content)
             transcript = result["text"]
@@ -153,6 +176,9 @@ class AudioEmbeddingStrategy(EmbeddingStrategy):
             List of embedding vectors
         """
         try:
+            # Ensure model is loaded
+            _ = self.model
+
             if not contents:
                 return []
 
@@ -214,14 +240,14 @@ _audio_embedder: Optional[AudioEmbeddingStrategy] = None
 
 
 def get_audio_embedder(
-    model_name: str = "nvidia/canary-qwen-2.5b",
+    model_name: str = "openai/whisper-base",
     text_model: str = "sentence-transformers/all-MiniLM-L6-v2",
 ) -> AudioEmbeddingStrategy:
     """
     Get or create global audio embedder instance.
 
     Args:
-        model_name: Canary-Qwen model name
+        model_name: Whisper model name
         text_model: Text embedding model name
 
     Returns:

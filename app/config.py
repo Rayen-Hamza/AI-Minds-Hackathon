@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     image_embedding_model: str = "facebook/dinov2-large"
     # SigLIP for text-to-image search (~400M params)
     text_to_image_model: str = "google/siglip-so400m-patch14-384"
-    # NVIDIA Canary-Qwen 2.5B for speech-to-text
-    speech_model: str = "nvidia/canary-qwen-2.5b"
+    # OpenAI Whisper Base for speech-to-text (~74M params, CPU-friendly)
+    speech_model: str = "openai/whisper-base"
 
     # Processing Configuration
     text_chunk_size: int = 512
