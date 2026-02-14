@@ -56,41 +56,49 @@ This system prioritizes architectural sophistication over brute-force model scal
 
 ## Core Architectural Patterns
 
-### 1. Strategy Pattern for Embedding
+### 1. Strategy Pattern for Embedding - **IMPLEMENTED**
 
 **Purpose**: Flexible, extensible embedding generation for heterogeneous data types
 
-**Structure**:
+**Implemented Structure**:
 
 ```
-EmbeddingStrategy (Interface)
+EmbeddingStrategy (Base Class)
 ├── TextEmbeddingStrategy
-│   ├── PlainTextStrategy
-│   ├── MarkdownStrategy
-│   └── CodeStrategy
+│   └── MiniLM (all-MiniLM-L6-v2)
+│       - Implements: embed(), embed_batch()
+│       - Output: 384-dim normalized vectors
+│
 ├── ImageEmbeddingStrategy
-│   ├── CLIPStrategy
-│   ├── DINOv2Strategy
-│   └── ImageBindStrategy
-├── VideoEmbeddingStrategy
-│   ├── FrameSamplingStrategy
-│   ├── SceneDetectionStrategy
-│   └── AudioVisualStrategy
-├── PDFEmbeddingStrategy
-│   ├── TextExtractionStrategy
-│   ├── LayoutAwareStrategy
-│   └── HybridStrategy (text + images)
+│   └── DINOv2Strategy (dinov2-large)
+│       - Implements: embed(), embed_batch()
+│       - Output: 1024-dim CLS token embeddings
+│
+├── CaptionEmbeddingStrategy
+│   └── SigLIP (siglip-so400m-patch14-384)
+│       - Implements: embed() [image], embed_text() [text]
+│       - Output: 1152-dim aligned embeddings
+│
 └── AudioEmbeddingStrategy
-    ├── WhisperTranscriptStrategy
-    └── AudioSpectrogramStrategy
+    └── Whisper + MiniLM Pipeline
+        - Implements: transcribe(), embed(), embed_batch()
+        - Process: Audio → Transcript → 384-dim vector
 ```
+
+**Implementation Location**: `app/services/embeddings/`
+
+**Key Features**:
+- Lazy-loaded singleton instances (memory efficient)
+- GPU/CPU adaptive model loading
+- Batch processing optimization
+- Error handling and fallback strategies
+- Normalized embeddings for cosine similarity
 
 **Key Benefits**:
-
-- Runtime strategy selection based on file type and content characteristics
-- Easy addition of new embedding models without system-wide changes
-- A/B testing different embedding approaches per content type
-- Graceful degradation when optimal models unavailable
+- Runtime strategy selection based on file type
+- Easy to add new models (extend base class)
+- Each strategy encapsulates model-specific logic
+- Graceful degradation (CPU fallback, placeholder vectors)
 
 ---
 
@@ -154,59 +162,75 @@ EmbeddingStrategy (Interface)
 
 ## Knowledge Storage Architecture
 
-### Vector Database Design
+### Vector Database Design - **IMPLEMENTED**
 
-**Technology Selection Criteria**:
+**Technology Selected**: **Qdrant** (local deployment)
 
-- Local deployment (Qdrant, Weaviate, Milvus, ChromaDB)
-- HNSW index for fast approximate nearest neighbor
-- Support for filtered search
-- Metadata payload storage
+**Architecture**: **Unified Collection with Named Vectors**
 
-**Schema Design**:
+Instead of separate collections per modality, we use a **single unified collection** with **named vectors** for different embedding types:
 
-**Collections**:
+**Collection**: `multimodal_embeddings`
 
-- `multimodal_embeddings`
+**Named Vectors**:
+- `text_vector` (384-dim): Text chunks and audio transcripts
+- `image_vector` (1024-dim): Image-to-image similarity (DINOv2)
+- `text_to_image_vector` (1152-dim): Text-to-image search (SigLIP)
 
 **Vector Entry Structure**:
 
-```
+```python
 {
-  id: UUID,
-  vector: [float],
+  id: "uuid-v4",
+  vector: {
+    "text_vector": [384-dim],           # For text/audio content
+    "image_vector": [1024-dim],         # For image similarity
+    "text_to_image_vector": [1152-dim]  # For text-to-image search
+  },
   payload: {
     source_path: string,
-    content_type: enum,
+    content_type: "text" | "image" | "audio",
+    file_type: string,
     chunk_index: int,
-    timestamp: datetime,
+    chunk_text: string,  # Actual text/caption/transcript
+    timestamp: ISO8601,
     content_hash: string,
     parent_doc_id: UUID,
-    metadata: {
-      file_size: int,
-      creation_date: datetime,
-      last_modified: datetime,
-      tags: [string],
-      extracted_entities: [string]
-    },
-    graph_node_id: string  // Link to Neo4j
+    file_size: int,
+    creation_date: ISO8601,
+    last_modified: ISO8601,
+    tags: [string],
+    extracted_entities: [string],
+    graph_node_id: string,  # Future Neo4j link
+
+    # Image-specific
+    image_width: int?,
+    image_height: int?,
+    exif_data: dict?,
+    ocr_text: string?,
+    caption: string?,
+
+    # Audio-specific
+    audio_duration: float?,
+    sample_rate: int?,
+    transcript: string?
   }
 }
 ```
 
 **Indexing Strategy**:
 
-- Hierarchical Navigable Small World (HNSW) graphs
-- M parameter: 16-32 for optimal recall/speed
-- ef_construction: 200-400 for quality
-- Separate indices per modality for optimized search
-- Cross-modal index for unified queries
+- **HNSW** (Hierarchical Navigable Small World) graphs
+- **M parameter**: 16 (balanced recall/speed)
+- **ef_construct**: 200 (quality index construction)
+- **Payload indexes** on: `content_type`, `file_type`, `content_hash`, `parent_doc_id`, `source_path`
+- **Distance metric**: Cosine similarity (normalized embeddings)
 
-**Similarity Metrics**:
-
-- Cosine similarity for text/image embeddings
-- Inner product for normalized vectors
-- Hybrid scoring combining dense and sparse representations
+**Benefits of Unified Collection**:
+- Simplified management (single collection)
+- Flexible search (cross-modality or filtered)
+- Efficient storage and indexing
+- Future support for multimodal fusion queries
 
 ---
 
@@ -797,21 +821,41 @@ Vector DB Writer + Graph Builder → Index Update
 
 ---
 
-## Technology Stack Recommendations
+## Technology Stack - **IMPLEMENTED**
 
-### Embedding Models
+### Embedding Models (Actual Implementation)
 
-- **Text**: MiniLM, BGE, E5, OpenAI Ada
-- **Image**: CLIP, BLIP-2, DINOv2, ImageBind
-- **Video**: X-CLIP, VideoMAE, CLIP frame sampling
-- **Audio**: Whisper (transcription), CLAP, AudioCLIP
+**Text Embeddings** (384-dim):
+- **Model**: `sentence-transformers/all-MiniLM-L6-v2`
+- **Usage**: Text chunks, audio transcripts
+- **Params**: ~23M (CPU-friendly, fast)
+- **Features**: Semantic similarity, L2 normalized
 
-### Vector Databases
+**Image Embeddings** (1024-dim):
+- **Model**: `facebook/dinov2-large`
+- **Usage**: Image-to-image similarity, clustering
+- **Params**: ~300M (GPU recommended)
+- **Features**: Self-supervised ViT-L, robust features
 
-- **Qdrant**: Rust-based, excellent performance, filtering
-- **Weaviate**: Native multimodal support, GraphQL API
-- **Milvus**: Distributed, high scalability
-- **ChromaDB**: Simplest setup, Python-native
+**Text-to-Image Embeddings** (1152-dim):
+- **Model**: `google/siglip-so400m-patch14-384`
+- **Usage**: Text-to-image search, cross-modal retrieval
+- **Params**: ~400M (GPU recommended)
+- **Features**: Sigmoid loss, improved over CLIP
+
+**Audio Processing**:
+- **Speech-to-Text**: `openai/whisper-base` (~74M params)
+- **Transcript Embedding**: MiniLM (reuses text model)
+- **Features**: CPU-friendly, 16kHz mono, automatic resampling
+
+### Vector Database (Selected)
+
+**Qdrant**:
+✅ Rust-based, excellent performance
+✅ Named vectors support (critical for our architecture)
+✅ Efficient filtering and payload indexing
+✅ Local deployment (Docker or native)
+✅ HNSW index with configurable parameters
 
 ### Graph Database
 
