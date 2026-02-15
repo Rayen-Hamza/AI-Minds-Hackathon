@@ -13,8 +13,13 @@ RELATED_TO edges link entity↔entity (strength).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from app.models.reasoning import ReasoningType
+
+# Characters that should never appear in a Cypher string literal value.
+# Stripping these prevents breaking out of the single-quoted string context.
+_CYPHER_DANGEROUS = re.compile(r"[{}()\[\];`]")
 
 
 @dataclass
@@ -32,7 +37,14 @@ class CypherTemplate:
             raise ValueError(f"Missing slots: {missing}")
         result = self.template
         for key, value in slots.items():
-            safe = str(value).replace("'", "\\'")
+            # Proper Cypher string escaping:
+            # 1. Escape backslashes first so we don't double-escape.
+            # 2. Escape single quotes.
+            # 3. Strip structural characters that could break Cypher syntax.
+            safe = str(value).replace("\\", "\\\\").replace("'", "\\\'")
+            safe = _CYPHER_DANGEROUS.sub("", safe)
+            # Length-limit to prevent oversized payloads
+            safe = safe[:500]
             result = result.replace(f"${key}", safe)
         return result
 

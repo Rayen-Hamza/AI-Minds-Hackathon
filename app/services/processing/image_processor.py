@@ -20,8 +20,23 @@ from app.services.label_mapping import TypedEntity
 from app.config import settings
 from .entity_extractor import get_entity_extractor
 from .text_extractor import ImageTextExtractor
+from .content_sanitizer import sanitize_ingested_text, sanitize_metadata_value
 
 logger = logging.getLogger(__name__)
+
+# Allowlist of safe EXIF metadata fields — text-heavy fields like
+# ImageDescription, UserComment, XPComment, Artist, Copyright are
+# excluded because they are common prompt-injection vectors.
+_SAFE_EXIF_TAGS = frozenset({
+    "Make", "Model", "DateTime", "DateTimeOriginal",
+    "DateTimeDigitized", "ExposureTime", "FNumber",
+    "ISOSpeedRatings", "FocalLength", "FocalLengthIn35mmFilm",
+    "ImageWidth", "ImageLength", "ExifImageWidth", "ExifImageHeight",
+    "Orientation", "Software", "GPSInfo",
+    "Flash", "MeteringMode", "WhiteBalance",
+    "ExposureProgram", "ExposureBiasValue",
+    "ColorSpace", "BitsPerSample", "Compression",
+})
 
 
 class ImageProcessor:
@@ -59,13 +74,16 @@ class ImageProcessor:
         try:
             img = Image.open(image_path)
 
-            # Get EXIF data
+            # Get EXIF data — only allowlisted fields to prevent
+            # prompt injection via metadata like ImageDescription / UserComment.
             exif_data = {}
             if hasattr(img, "_getexif") and img._getexif():
                 exif = img._getexif()
                 for tag_id, value in exif.items():
                     tag = TAGS.get(tag_id, tag_id)
-                    exif_data[tag] = str(value)
+                    if tag not in _SAFE_EXIF_TAGS:
+                        continue
+                    exif_data[tag] = sanitize_metadata_value(str(value))
 
             logger.debug(
                 f"Extracted {len(exif_data)} EXIF fields from {Path(image_path).name}"
@@ -168,15 +186,20 @@ class ImageProcessor:
             # Extract EXIF
             exif_data = self.extract_exif(image_path)
 
-            # Perform OCR
+            # Perform OCR — sanitize to strip prompt-injection payloads
             ocr_text = None
             if enable_ocr:
-                ocr_text = self.perform_ocr(image_path)
+                raw_ocr = self.perform_ocr(image_path)
+                if raw_ocr:
+                    ocr_text = sanitize_ingested_text(raw_ocr, source="ocr")
 
-            # Generate caption
+            # Generate caption — sanitize (captions are model-generated but
+            # adversarial images can influence BLIP output)
             caption = None
             if enable_caption:
-                caption = self.generate_caption(image_path)
+                raw_caption = self.generate_caption(image_path)
+                if raw_caption:
+                    caption = sanitize_ingested_text(raw_caption, source="caption")
 
             # Extract typed entities from caption and OCR text
             entities = []
