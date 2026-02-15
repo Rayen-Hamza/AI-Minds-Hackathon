@@ -88,7 +88,7 @@ async def ingest_text(
 
             # Check if content changed
             file_hash = content_hasher.hash_content(temp_path, "text")
-            existing = await qdrant_manager.search_by_hash(
+            existing = qdrant_manager.search_by_hash(
                 settings.unified_collection, file_hash
             )
 
@@ -114,7 +114,7 @@ async def ingest_text(
         elif content:
             # Check if content changed
             content_hash = content_hasher.hash_text(content)
-            existing = await qdrant_manager.search_by_hash(
+            existing = qdrant_manager.search_by_hash(
                 settings.unified_collection, content_hash
             )
 
@@ -215,7 +215,7 @@ async def ingest_image(
 
         # Check if image changed (perceptual hash)
         image_hash = content_hasher.hash_image(temp_path)
-        existing = await qdrant_manager.search_by_hash(
+        existing = qdrant_manager.search_by_hash(
             settings.unified_collection, image_hash
         )
 
@@ -300,7 +300,7 @@ async def ingest_audio(file: UploadFile = File(...), tags: Optional[str] = Form(
 
         # Check if audio changed
         audio_hash = content_hasher.hash_audio(temp_path)
-        existing = await qdrant_manager.search_by_hash(
+        existing = qdrant_manager.search_by_hash(
             settings.unified_collection, audio_hash
         )
 

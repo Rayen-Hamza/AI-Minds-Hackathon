@@ -25,10 +25,8 @@ class Settings(BaseSettings):
 
     # Embedding Models
     text_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    # DINOv2 ViT-L for image similarity/clustering (~300M params)
-    image_embedding_model: str = "facebook/dinov2-large"
-    # SigLIP for text-to-image search (~400M params)
-    text_to_image_model: str = "google/siglip-so400m-patch14-384"
+    # BLIP for image captioning (text-centric approach)
+    image_captioning_model: str = "Salesforce/blip-image-captioning-base"
     # OpenAI Whisper Base for speech-to-text (~74M params, CPU-friendly)
     speech_model: str = "openai/whisper-base"
 
@@ -40,13 +38,11 @@ class Settings(BaseSettings):
     text_chunk_overlap: int = 50
     max_file_size_mb: int = 100
 
-    # Collection Names (unified collection with named vectors)
+    # Collection Names (unified collection with single text vector)
     unified_collection: str = "multimodal_embeddings"
 
-    # Embedding Dimensions
+    # Embedding Dimensions (text-centric: single dimension for all)
     text_embedding_dim: int = 384  # MiniLM-L6-v2
-    image_embedding_dim: int = 1024  # DINOv2 ViT-L
-    text_to_image_dim: int = 1152  # SigLIP SO400M
 
     # HNSW Index Configuration
     hnsw_m: int = 16
