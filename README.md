@@ -196,6 +196,14 @@ API docs at: http://localhost:8000/docs
 | `/collections` | GET | List collections with stats |
 | `/collections/create` | POST | Initialize collections |
 
+### Agents (ADK)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/agent/chat` | POST | Chat with AI agents (orchestrator or qdrant) |
+| `/agent/agents` | GET | List available agents and capabilities |
+| `/agent/sessions` | GET | List active agent sessions |
+| `/agent/sessions/{id}` | DELETE | Delete an agent session |
+
 ## Usage Examples
 
 ### Ingest text
@@ -234,6 +242,57 @@ curl -X POST http://localhost:8000/search/by-type/image \
   -d '{"query": "red car", "limit": 5}'
 ```
 
+### Chat with agents (ADK)
+```bash
+# Chat with orchestrator agent
+curl -X POST http://localhost:8000/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What are the system capabilities?", "agent": "orchestrator"}'
+
+# Search using Qdrant agent
+curl -X POST http://localhost:8000/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Search for vector databases", "agent": "qdrant"}'
+
+# List available agents
+curl http://localhost:8000/agent/agents
+```
+
+## AI Agents (Google ADK)
+
+The system includes AI agents built with [Google's Agent Development Kit (ADK)](https://google.github.io/adk-docs/) for natural language interaction:
+
+### 🤖 Orchestrator Agent
+Main coordinator that routes requests and manages conversations:
+- Task routing and delegation
+- System status and information
+- Multi-agent coordination
+- Conversation management
+
+### 🔍 Qdrant Agent
+Specialized agent for vector database operations:
+- Semantic search across all content types
+- Collection management
+- Database statistics
+- Filter-based retrieval
+
+### Setup
+1. Get API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Add to `.env`:
+   ```bash
+   GOOGLE_API_KEY=your_key_here
+   GOOGLE_GENAI_USE_VERTEXAI=False
+   ```
+3. Test agents:
+   ```bash
+   # Interactive CLI
+   python -m app.test_agents
+   
+   # Or use API endpoints (see above)
+   ```
+
+See [`app/agents/README.md`](app/agents/README.md) for detailed agent documentation.
+
 ## Configuration
 
 All settings via environment variables or `.env` file:
@@ -250,6 +309,8 @@ All settings via environment variables or `.env` file:
 | `TEXT_EMBEDDING_DIM` | `384` | Embedding dimension |
 | `HNSW_M` | `16` | HNSW M parameter |
 | `HNSW_EF_CONSTRUCT` | `200` | HNSW ef_construct |
+| `GOOGLE_API_KEY` | - | **Required for ADK agents** - Get from [AI Studio](https://aistudio.google.com/app/apikey) |
+| `GOOGLE_GENAI_USE_VERTEXAI` | `False` | Use API key auth (not Vertex AI) |
 
 ## Project Structure
 
@@ -257,12 +318,17 @@ All settings via environment variables or `.env` file:
 app/
 ├── main.py                          # FastAPI app + startup
 ├── config.py                        # Pydantic settings
+├── agents/                          # ★ ADK Agents
+│   ├── orchestrator.py              # Main coordinator agent
+│   ├── qdrant_agent.py              # Vector DB specialist agent
+│   └── README.md                    # Agent documentation
 ├── models/
 │   └── models.py                    # Data models (TextChunk, ImageData, etc.)
 ├── routes/
 │   ├── health.py                    # Health + admin routes
 │   ├── ingest_routes.py             # Ingestion endpoints
-│   └── search_routes.py             # Unified search endpoints
+│   ├── search_routes.py             # Unified search endpoints
+│   └── agent_routes.py              # ★ Agent interaction endpoints
 └── services/
     ├── embeddings/
     │   ├── base.py                  # Base embedding strategy

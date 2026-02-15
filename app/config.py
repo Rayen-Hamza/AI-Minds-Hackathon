@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_reload: bool = True
+    app_debug: bool = False
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
@@ -29,6 +30,9 @@ class Settings(BaseSettings):
     image_captioning_model: str = "Salesforce/blip-image-captioning-base"
     # OpenAI Whisper Base for speech-to-text (~74M params, CPU-friendly)
     speech_model: str = "openai/whisper-base"
+
+    # spaCy NER model (download with: python -m spacy download en_core_web_sm)
+    spacy_model: str = "en_core_web_sm"
 
     # Processing Configuration
     text_chunk_size: int = 512
@@ -47,6 +51,12 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
+
+    # LLM Configuration (Local or API)
+    llm_provider: str = "ollama"  # "ollama", "openai", or "gemini"
+    llm_model: str = "qwen2.5:3b"  # Model name for Ollama
+    llm_base_url: str = "http://localhost:11434/v1"  # Ollama OpenAI-compatible endpoint
+    llm_api_key: Optional[str] = None  # Not needed for Ollama
 
     # Neo4j (for future integration)
     neo4j_uri: Optional[str] = None

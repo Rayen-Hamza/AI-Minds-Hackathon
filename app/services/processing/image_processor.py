@@ -15,6 +15,9 @@ from PIL.ExifTags import TAGS
 
 from app.models.models import ImageData
 from app.services.storage.content_hasher import get_content_hasher
+from app.services.embeddings.caption_strategy import get_caption_embedder
+from app.services.label_mapping import TypedEntity
+from app.config import settings
 from .entity_extractor import get_entity_extractor
 from .text_extractor import ImageTextExtractor
 
@@ -175,15 +178,31 @@ class ImageProcessor:
             if enable_caption:
                 caption = self.generate_caption(image_path)
 
-            # Extract entities from caption and OCR text
+            # Extract typed entities from caption and OCR text
             entities = []
-            if caption:
-                entities.extend(self.entity_extractor.extract_entities(caption))
-            if ocr_text:
-                entities.extend(self.entity_extractor.extract_entities(ocr_text))
+            typed_entities = []
+            for source_text in (caption, ocr_text):
+                if not source_text:
+                    continue
+                labeled = self.entity_extractor.extract_entities_with_labels(
+                    source_text
+                )
+                for ent in labeled:
+                    entities.append(ent["text"])
+                    te = TypedEntity.from_spacy(ent["text"], ent["label"])
+                    if te is not None:
+                        typed_entities.append(te.to_entity_payload_dict())
 
             # Remove duplicates
             entities = list(dict.fromkeys(entities))
+            seen_typed: set[str] = set()
+            deduped_typed: list[dict] = []
+            for td in typed_entities:
+                key = td["text"].lower()
+                if key not in seen_typed:
+                    seen_typed.add(key)
+                    deduped_typed.append(td)
+            typed_entities = deduped_typed
 
             # Create ImageData object
             image_data = ImageData(
@@ -200,6 +219,7 @@ class ImageProcessor:
                 last_modified=last_modified,
                 tags=custom_tags or [],
                 extracted_entities=entities,
+                typed_entities=typed_entities,
             )
 
             logger.info(

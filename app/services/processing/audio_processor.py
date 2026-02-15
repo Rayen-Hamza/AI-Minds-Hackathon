@@ -15,6 +15,7 @@ from app.models.models import AudioChunk
 from app.config import settings
 from app.services.storage.content_hasher import get_content_hasher
 from app.services.embeddings.audio_strategy import get_audio_embedder
+from app.services.label_mapping import TypedEntity
 from .entity_extractor import get_entity_extractor
 from .text_processor import get_text_processor
 
@@ -35,6 +36,27 @@ class AudioProcessor:
         self._audio_embedder = None  # Lazy load
 
         logger.info("Initialized AudioProcessor")
+
+    def _extract_typed_entities(self, text: str) -> tuple[list[str], list[dict]]:
+        """Extract entities using spaCy, returning both flat and typed lists."""
+        labeled = self.entity_extractor.extract_entities_with_labels(text)
+        if not labeled:
+            return [], []
+
+        seen: set[str] = set()
+        flat: list[str] = []
+        typed: list[dict] = []
+        for ent in labeled:
+            key = ent["text"].lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            flat.append(ent["text"])
+            te = TypedEntity.from_spacy(ent["text"], ent["label"])
+            if te is not None:
+                typed.append(te.to_entity_payload_dict())
+
+        return flat, typed
 
     @property
     def audio_embedder(self):
@@ -169,8 +191,8 @@ class AudioProcessor:
             file_type = audio_path.suffix.lstrip(".") or "audio"
 
             for idx, chunk_text in enumerate(transcript_chunks):
-                # Extract entities from this chunk
-                entities = self.entity_extractor.extract_entities(chunk_text)
+                # Extract typed entities from this chunk
+                entities, typed = self._extract_typed_entities(chunk_text)
 
                 # Create AudioChunk object
                 audio_chunk = AudioChunk(
@@ -188,6 +210,7 @@ class AudioProcessor:
                     last_modified=last_modified,
                     tags=custom_tags or [],
                     extracted_entities=entities,
+                    typed_entities=typed,
                 )
 
                 audio_chunks.append(audio_chunk)

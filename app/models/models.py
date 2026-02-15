@@ -109,6 +109,8 @@ class TextChunk(BaseModel):
     last_modified: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     extracted_entities: list[str] = Field(default_factory=list)
+    # Typed entity dicts: [{"text": ..., "type": ..., "confidence": ...}]
+    typed_entities: list[dict] = Field(default_factory=list)
 
 
 class ImageData(BaseModel):
@@ -126,6 +128,7 @@ class ImageData(BaseModel):
     last_modified: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     extracted_entities: list[str] = Field(default_factory=list)
+    typed_entities: list[dict] = Field(default_factory=list)
 
 
 class AudioChunk(BaseModel):
@@ -144,6 +147,7 @@ class AudioChunk(BaseModel):
     last_modified: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
     extracted_entities: list[str] = Field(default_factory=list)
+    typed_entities: list[dict] = Field(default_factory=list)
 
 
 # ============================================================================
