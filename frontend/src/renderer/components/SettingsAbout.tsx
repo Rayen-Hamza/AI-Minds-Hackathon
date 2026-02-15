@@ -13,7 +13,25 @@ export const SettingsAbout: React.FC = () => {
 
   return (
     <div>
-      <h1>About Klippy</h1>
+      <h1>About Klippy 📎</h1>
+      <p style={{ fontStyle: "italic", marginBottom: "12px" }}>
+        Paperclips Organized Your Documents Since 1867.<br/>Now They Understand Them.
+      </p>
+      <fieldset>
+        <legend>What is Klippy?</legend>
+        <p>
+          <strong>Klippy</strong> is a <strong>local-first AI assistant</strong> that remembers everything. It combines:
+        </p>
+        <ul style={{ marginTop: "8px", marginBottom: "8px" }}>
+          <li>🔍 <strong>Multimodal RAG</strong> – Search across text, images, and audio with one query</li>
+          <li>🧠 <strong>Knowledge Graph Reasoning</strong> – Neo4j-powered ontological reasoning for complex queries</li>
+          <li>⚡ <strong>Prompt Chaining</strong> – Google ADK agents orchestrate multi-step reasoning pipelines</li>
+          <li>💾 <strong>Personal Memory</strong> – Your data stays local, your assistant gets smarter</li>
+        </ul>
+        <p style={{ marginTop: "8px", fontSize: "0.9em" }}>
+          <strong>Architecture Philosophy:</strong> <em>"Graph-as-Brain, LLM-as-Mouth"</em> – All reasoning is pre-computed via deterministic graph logic. The LLM only narrates the answer. This allows sub-4B models like Qwen2.5:3b to perform like much larger models.
+        </p>
+      </fieldset>
       <fieldset>
         <legend>Version Information</legend>
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -28,53 +46,38 @@ export const SettingsAbout: React.FC = () => {
           </div>
         </div>
       </fieldset>
+      <fieldset>
+        <legend>Tech Stack</legend>
+        <p>
+          <strong>Backend:</strong> FastAPI, Python 3.12+, Pydantic<br/>
+          <strong>Frontend:</strong> Electron, React, TypeScript, Vite<br/>
+          <strong>Vector DB:</strong> Qdrant (HNSW indexing)<br/>
+          <strong>Graph DB:</strong> Neo4j (Cypher queries)<br/>
+          <strong>LLM:</strong> Ollama (Qwen2.5:3b / Llama3.2)<br/>
+          <strong>Agents:</strong> Google ADK, LiteLLM<br/>
+          <strong>Embeddings:</strong> MiniLM-L6-v2 (384-dim)<br/>
+          <strong>Vision:</strong> BLIP (image captioning), Tesseract (OCR)<br/>
+          <strong>Speech:</strong> Whisper (speech-to-text)<br/>
+          <strong>NLP:</strong> spaCy (NER, relationship extraction)
+        </p>
+      </fieldset>
+      <h3>Hackathon Project</h3>
       <p>
-        This app is a love letter and homage to the late, great Clippy, the
-        assistant from Microsoft Office 1997. It is <i>not</i> affiliated,
-        approved, or supported by Microsoft. Consider it software art. If you
-        don't like it, consider it software satire.
+        This project was built for the <strong>AI-Minds Hackathon 2026</strong>. It demonstrates how combining knowledge graphs with small language models can create powerful local-first AI assistants.
       </p>
-      <h3>Acknowledgments</h3>
-      <p>
-        This app was made by{" "}
-        <a href="https://github.com/felixrieseberg" target="_blank">
-          Felix Rieseberg
-        </a>{" "}
-        using{" "}
-        <a href="https://electronjs.org/" target="_blank">
-          Electron
-        </a>{" "}
-        and{" "}
-        <a href="https://node-llama-cpp.withcat.ai/" target="_blank">
-          node-llama-cpp
-        </a>
-        , embedded using{" "}
-        <a href="https://github.com/electron/llm" target="_blank">
-          @electron/llm
-        </a>
-        . The whimsical retro design was made possible by{" "}
-        <a href="https://github.com/jdan" target="_blank">
-          Jordan Scales
-        </a>
-        . Quantized GGUF models provided by{" "}
-        <a href="https://www.unsloth.ai" target="_blank">
-          Unsloth
-        </a>
-        .
-      </p>
-      <p>
-        The character was designed by illustrator{" "}
+      <p style={{ fontSize: "0.9em", marginTop: "12px" }}>
+        The character design is inspired by Microsoft's Clippy from Office 1997, designed by illustrator{" "}
         <a href="https://www.kevanatteberry.com/" target="_blank">
           Kevan Atteberry
         </a>
-        , who created more than 15 potential characters for Microsoft's Office
-        Assistants. "He's a guy that just wants to help, and he's a little bit
-        too helpful sometimes — and there's something fun and vulnerable about
-        that.", he once said about Clippy.
+        . This project is not affiliated with Microsoft.
       </p>
-      <p>
-        Clippy and all visual assets related to Clippy are owned by Microsoft.
-        This app is not affiliated with Microsoft.
+      <p style={{ fontSize: "0.9em", marginTop: "8px" }}>
+        <strong>License:</strong> MIT – See the{" "}
+        <a href="https://github.com/Rayen-Hamza/AI-Minds-Hackathon" target="_blank">
+          GitHub repository
+        </a>{" "}
+        for details.
       </p>
     </div>
   );

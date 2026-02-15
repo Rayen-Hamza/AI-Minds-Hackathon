@@ -1,7 +1,7 @@
 import Markdown from "react-markdown";
 import { useState } from "react";
 import questionIcon from "../images/icons/question.png";
-import defaultKlippy from "../images/animations/Default.png";
+import iconV2 from "../../../assets/icon_v2.png";
 import { MessageRecord } from "../../types/interfaces";
 
 export interface Message extends MessageRecord {
@@ -235,7 +235,7 @@ export function Message({ message }: { message: Message }) {
       style={{ display: "flex", alignItems: "flex-start" }}
     >
       <img
-        src={isUser ? questionIcon : defaultKlippy}
+        src={isUser ? questionIcon : iconV2}
         alt={isUser ? "You" : "Klippy"}
         style={{
           width: "28px",

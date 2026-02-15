@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/src/renderer/images/animations/Default.png" alt="Klippy" width="200"/>
+  <img src="frontend/assets/icon_v2.png" alt="Klippy" width="200"/>
 </p>
 
 <p align="center">
