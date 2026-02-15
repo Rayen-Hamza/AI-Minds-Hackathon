@@ -16,6 +16,10 @@ _driver: Driver | None = None
 def init_driver() -> Driver:
     """Create the global Neo4j driver (called at startup)."""
     global _driver  # noqa: PLW0603
+
+    if not settings.neo4j_uri:
+        raise ValueError("NEO4J_URI is not configured")
+
     _driver = GraphDatabase.driver(
         settings.neo4j_uri,
         auth=(settings.neo4j_user, settings.neo4j_password),

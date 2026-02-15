@@ -14,7 +14,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 
-from ..agents import root_agent, qdrant_agent
+from ..agents import root_agent, qdrant_agent, neo4j_agent
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agents"])
@@ -35,6 +35,10 @@ qdrant_runner = Runner(
     agent=qdrant_agent, app_name=APP_NAME, session_service=session_service
 )
 
+neo4j_runner = Runner(
+    agent=neo4j_agent, app_name=APP_NAME, session_service=session_service
+)
+
 # Store active sessions metadata
 active_sessions = {}
 
@@ -49,7 +53,7 @@ class AgentRequest(BaseModel):
 
     message: str
     session_id: Optional[str] = None
-    agent: Optional[str] = "orchestrator"  # "orchestrator" or "qdrant"
+    agent: Optional[str] = "orchestrator"  # "orchestrator", "qdrant", or "neo4j"
 
 
 class AgentResponse(BaseModel):
@@ -91,6 +95,9 @@ async def chat_with_agent(request: AgentRequest):
         if request.agent == "qdrant":
             agent = qdrant_agent
             runner = qdrant_runner
+        elif request.agent == "neo4j":
+            agent = neo4j_agent
+            runner = neo4j_runner
         else:
             agent = root_agent
             runner = orchestrator_runner
@@ -233,6 +240,17 @@ async def list_agents():
                     "Vector database management",
                     "Collection information",
                     "Metadata filtering",
+                ],
+            },
+            {
+                "name": "neo4j",
+                "agent_name": neo4j_agent.name,
+                "description": "Specialized agent for knowledge graph queries and graph analytics",
+                "capabilities": [
+                    "Natural language graph queries",
+                    "Entity lookup with fuzzy matching",
+                    "Relationship exploration and path finding",
+                    "Graph statistics and topic cluster discovery",
                 ],
             },
         ]

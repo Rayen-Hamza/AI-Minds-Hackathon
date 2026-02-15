@@ -112,18 +112,27 @@ async def lifespan(_app: FastAPI):
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
 
-    driver = init_driver()
+    # Initialize Neo4j if configured
+    try:
+        driver = init_driver()
 
-    # Ensure Neo4j schema (constraints, indexes)
-    from app.services.graph_schema import ensure_schema
+        # Ensure Neo4j schema (constraints, indexes)
+        from app.services.graph_schema import ensure_schema
 
-    ensure_schema(driver)
+        ensure_schema(driver)
 
-    # Pre-warm entity resolver cache
-    from app.services.entity_resolver import EntityResolver
+        # Pre-warm entity resolver cache
+        from app.services.entity_resolver import EntityResolver
 
-    resolver = EntityResolver(driver)
-    resolver.refresh_cache()
+        resolver = EntityResolver(driver)
+        resolver.refresh_cache()
+
+        logger.info("Neo4j initialized successfully")
+    except Exception as e:
+        logger.warning(
+            f"Neo4j initialization failed: {e}. "
+            "Knowledge graph features will be unavailable."
+        )
 
     logger.info("Application startup complete.")
 

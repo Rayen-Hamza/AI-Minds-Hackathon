@@ -10,6 +10,7 @@ from google.adk.tools import FunctionTool, AgentTool
 from google.adk.models import LiteLlm
 
 from .qdrant_agent import qdrant_agent
+from .neo4j_agent import neo4j_agent
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,10 @@ def get_capabilities() -> Dict[str, Any]:
                         "name": "Qdrant Agent",
                         "role": "Vector database specialist for search and retrieval",
                     },
+                    {
+                        "name": "Neo4j Agent",
+                        "role": "Knowledge graph specialist for entity resolution, relationship traversal, and graph analytics",
+                    },
                 ],
             },
             "database": {
@@ -189,6 +194,16 @@ def analyze_request(user_query: str) -> Dict[str, Any]:
             intent = "information"
             recommended_agent = "orchestrator"
 
+        # Knowledge graph keywords
+        graph_keywords = [
+            "graph", "entity", "relationship", "connected", "path between",
+            "knowledge graph", "neo4j", "topic cluster", "who knows",
+            "related to", "linked to",
+        ]
+        if any(keyword in query_lower for keyword in graph_keywords):
+            intent = "graph_query"
+            recommended_agent = "neo4j_agent"
+
         # Database management keywords
         db_keywords = ["collection", "database", "vectors", "embeddings"]
         if any(keyword in query_lower for keyword in db_keywords):
@@ -227,26 +242,28 @@ root_agent = Agent(
     ),
     description="""You are the main orchestrator agent for a multimodal RAG (Retrieval-Augmented Generation) system.
     You coordinate tasks, manage conversations, and delegate to specialized agents when needed.
-    
+
     You work with a team of specialized agents:
     - Qdrant Agent: Expert in vector database operations and semantic search
-    
+    - Neo4j Agent: Expert in knowledge graph queries, entity resolution, relationship traversal, and graph analytics
+
     Your responsibilities:
     1. Understand user requests and route them appropriately
     2. Provide system information and status updates
     3. Explain system capabilities
     4. Coordinate between different agents for complex tasks
     5. Maintain conversation context and provide helpful responses
-    
+
     The system handles multimodal content (text, images, audio) using a unified text-centric embedding approach.""",
     instruction="""You are a helpful, professional orchestrator agent.
-    
+
     When users ask questions:
     1. Determine if it's a search/retrieval task → delegate to qdrant_agent
-    2. For system status/info → use get_system_status
-    3. For capabilities/help → use get_capabilities
-    4. For general conversation → respond directly with helpful information
-    
+    2. For knowledge graph queries (entities, relationships, paths, topics, graph analytics) → delegate to neo4j_agent
+    3. For system status/info → use get_system_status
+    4. For capabilities/help → use get_capabilities
+    5. For general conversation → respond directly with helpful information
+
     Guidelines:
     - Be friendly and professional
     - Explain what you're doing when delegating to other agents
@@ -258,12 +275,17 @@ root_agent = Agent(
     - Clearly pass the search query
     - Let the qdrant_agent handle the technical details
     - Summarize results in a user-friendly way if needed
-    
+    When delegating to the neo4j_agent:
+    - Use it for entity lookups, relationship exploration, path finding, and graph analytics
+    - Let the neo4j_agent handle Cypher execution and entity resolution
+    - Summarize graph results in a user-friendly way if needed
+
     You have access to system information and can coordinate with specialized agents.""",
     tools=[
         FunctionTool(func=get_system_status),
         FunctionTool(func=get_capabilities),
         FunctionTool(func=analyze_request),
         AgentTool(agent=qdrant_agent),
+        AgentTool(agent=neo4j_agent),
     ],
 )

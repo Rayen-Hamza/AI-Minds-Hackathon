@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_reload: bool = True
+    app_debug: bool = False
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
