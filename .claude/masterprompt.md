@@ -56,49 +56,52 @@ This system prioritizes architectural sophistication over brute-force model scal
 
 ## Core Architectural Patterns
 
-### 1. Strategy Pattern for Embedding - **IMPLEMENTED**
+### 1. Text-Centric Multimodal Pipeline - **IMPLEMENTED**
 
-**Purpose**: Flexible, extensible embedding generation for heterogeneous data types
+**Purpose**: Convert ALL modalities to text, then embed with a single model into a unified vector space
+
+**Architecture**: "False Multimodality" — every modality is converted to text (captions, transcripts, OCR) before embedding. This enables: (1) unified cross-modal search with a single vector, (2) entity extraction across all content, (3) knowledge graph construction.
 
 **Implemented Structure**:
 
 ```
-EmbeddingStrategy (Base Class)
-├── TextEmbeddingStrategy
-│   └── MiniLM (all-MiniLM-L6-v2)
-│       - Implements: embed(), embed_batch()
-│       - Output: 384-dim normalized vectors
-│
-├── ImageEmbeddingStrategy
-│   └── DINOv2Strategy (dinov2-large)
-│       - Implements: embed(), embed_batch()
-│       - Output: 1024-dim CLS token embeddings
-│
-├── CaptionEmbeddingStrategy
-│   └── SigLIP (siglip-so400m-patch14-384)
-│       - Implements: embed() [image], embed_text() [text]
-│       - Output: 1152-dim aligned embeddings
-│
-└── AudioEmbeddingStrategy
-    └── Whisper + MiniLM Pipeline
-        - Implements: transcribe(), embed(), embed_batch()
-        - Process: Audio → Transcript → 384-dim vector
+UnifiedTextExtractor (dispatcher)
+├── PlainTextExtractor       → reads text files directly
+├── PDFTextExtractor          → PyMuPDF text extraction
+├── ImageTextExtractor        → BLIP captioning + Tesseract OCR → text
+└── AudioTextExtractor        → Whisper transcription → text
+        ↓ all produce plain text ↓
+TextEmbeddingStrategy (MiniLM all-MiniLM-L6-v2)
+    → embed() / embed_batch()
+    → 384-dim normalized vectors
+    → stored in single Qdrant text_vector
 ```
 
-**Implementation Location**: `app/services/embeddings/`
+**Implementation Location**:
+- Text extraction: `app/services/processing/text_extractor.py`
+- Text embedding: `app/services/embeddings/text_strategy.py`
+- Audio transcription: `app/services/embeddings/audio_strategy.py`
+
+**Models Used**:
+- **Text Embedding**: `sentence-transformers/all-MiniLM-L6-v2` (23M params, 384-dim) — THE ONLY embedding model
+- **Image Captioning**: `Salesforce/blip-image-captioning-base` (247M params) — generates text descriptions
+- **Speech-to-Text**: `openai/whisper-base` (74M params) — transcribes audio to text
+- **Entity Extraction**: `spaCy en_core_web_sm` (12M params) — NER + relationship extraction
 
 **Key Features**:
-- Lazy-loaded singleton instances (memory efficient)
+- Lazy-loaded singleton instances (models load on first use, not at startup)
 - GPU/CPU adaptive model loading
 - Batch processing optimization
 - Error handling and fallback strategies
 - Normalized embeddings for cosine similarity
+- Entity + relationship extraction from all text (for Neo4j graph)
 
 **Key Benefits**:
-- Runtime strategy selection based on file type
-- Easy to add new models (extend base class)
-- Each strategy encapsulates model-specific logic
-- Graceful degradation (CPU fallback, placeholder vectors)
+- Single vector space — one query searches ALL content types
+- Entity extraction works on ALL content (since everything is text)
+- Knowledge graph construction from entities and S→P→O triples
+- Simplified Qdrant schema (single vector, single collection)
+- Lower memory footprint (no DINOv2 300M or SigLIP 400M)
 
 ---
 
@@ -166,16 +169,14 @@ EmbeddingStrategy (Base Class)
 
 **Technology Selected**: **Qdrant** (local deployment)
 
-**Architecture**: **Unified Collection with Named Vectors**
+**Architecture**: **Unified Collection with Single Text Vector (Text-Centric)**
 
-Instead of separate collections per modality, we use a **single unified collection** with **named vectors** for different embedding types:
+All content types are converted to text first, then embedded with MiniLM into a **single vector space**. This replaces the previous multi-vector approach (DINOv2 + SigLIP + MiniLM) with a simpler, more powerful architecture.
 
 **Collection**: `multimodal_embeddings`
 
-**Named Vectors**:
-- `text_vector` (384-dim): Text chunks and audio transcripts
-- `image_vector` (1024-dim): Image-to-image similarity (DINOv2)
-- `text_to_image_vector` (1152-dim): Text-to-image search (SigLIP)
+**Single Vector**:
+- `text_vector` (384-dim, COSINE): Embeds text, image captions, OCR text, and audio transcripts — ALL in the same space
 
 **Vector Entry Structure**:
 
@@ -823,39 +824,48 @@ Vector DB Writer + Graph Builder → Index Update
 
 ## Technology Stack - **IMPLEMENTED**
 
-### Embedding Models (Actual Implementation)
+### Models (Text-Centric Architecture)
 
-**Text Embeddings** (384-dim):
+**Text Embedding — SINGLE MODEL FOR ALL CONTENT** (384-dim):
 - **Model**: `sentence-transformers/all-MiniLM-L6-v2`
-- **Usage**: Text chunks, audio transcripts
+- **Usage**: ALL content types (text chunks, image captions/OCR, audio transcripts)
 - **Params**: ~23M (CPU-friendly, fast)
-- **Features**: Semantic similarity, L2 normalized
+- **Features**: Semantic similarity, L2 normalized, 384-dim
 
-**Image Embeddings** (1024-dim):
-- **Model**: `facebook/dinov2-large`
-- **Usage**: Image-to-image similarity, clustering
-- **Params**: ~300M (GPU recommended)
-- **Features**: Self-supervised ViT-L, robust features
+**Image Captioning** (text extraction from images):
+- **Model**: `Salesforce/blip-image-captioning-base`
+- **Usage**: Generate natural language descriptions of images
+- **Params**: ~247M (CPU OK, GPU faster)
+- **Features**: Conditional captioning with prompt, lazy-loaded on first image
 
-**Text-to-Image Embeddings** (1152-dim):
-- **Model**: `google/siglip-so400m-patch14-384`
-- **Usage**: Text-to-image search, cross-modal retrieval
-- **Params**: ~400M (GPU recommended)
-- **Features**: Sigmoid loss, improved over CLIP
+**OCR** (text extraction from images):
+- **Tool**: Tesseract (optional, disabled if not installed)
+- **Usage**: Extract visible text from images
+- **Features**: Grayscale + Otsu thresholding preprocessing
 
-**Audio Processing**:
-- **Speech-to-Text**: `openai/whisper-base` (~74M params)
-- **Transcript Embedding**: MiniLM (reuses text model)
-- **Features**: CPU-friendly, 16kHz mono, automatic resampling
+**Audio Transcription** (text extraction from audio):
+- **Model**: `openai/whisper-base` (~74M params)
+- **Usage**: Speech-to-text for audio files
+- **Features**: CPU-friendly, 16kHz mono, automatic resampling from other sample rates
+
+**Entity Extraction** (for knowledge graph):
+- **Model**: `spaCy en_core_web_sm` (~12M params)
+- **Usage**: NER + relationship extraction (S→P→O triples)
+- **Features**: Dependency parsing, noun phrase expansion
+
+**REMOVED** (no longer used):
+- ~~`facebook/dinov2-large`~~ (1024-dim image embeddings)
+- ~~`google/siglip-so400m-patch14-384`~~ (1152-dim text-to-image embeddings)
 
 ### Vector Database (Selected)
 
 **Qdrant**:
 ✅ Rust-based, excellent performance
-✅ Named vectors support (critical for our architecture)
-✅ Efficient filtering and payload indexing
-✅ Local deployment (Docker or native)
-✅ HNSW index with configurable parameters
+✅ Single `text_vector` (384-dim) for all content types
+✅ Efficient filtering by `content_type` (text/image/audio)
+✅ Payload indexing on content_type, source_path, content_hash, parent_doc_id
+✅ Local deployment via Docker Compose (port 6333)
+✅ HNSW index (M=16, ef_construct=200, Cosine distance)
 
 ### Graph Database
 
