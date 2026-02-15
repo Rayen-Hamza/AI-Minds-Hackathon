@@ -55,6 +55,8 @@ export type KlippyApi = {
   clipboardWrite: (data: Data) => Promise<void>;
   // Agent
   agentChat: (message: string, sessionId: string) => Promise<any>;
+  // File System
+  openFileInFolder: (filePath: string) => Promise<void>;
 };
 
 declare global {

@@ -46,4 +46,7 @@ export const IpcMessages = {
 
   // Agent
   AGENT_CHAT: "klippy_agent_chat",
+
+  // File System
+  OPEN_FILE_IN_FOLDER: "klippy_open_file_in_folder",
 };

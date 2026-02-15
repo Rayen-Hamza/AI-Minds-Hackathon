@@ -102,6 +102,7 @@ async def chat_with_agent(request: AgentRequest):
         else:
             agent = root_agent
             runner = orchestrator_runner
+        logger.info(f"Selected agent: {agent.name}, runner: {runner}")
 
         # Get or create session
         session_id = request.session_id or str(uuid4())
@@ -139,11 +140,13 @@ async def chat_with_agent(request: AgentRequest):
         for event in runner.run(
             user_id=DEFAULT_USER_ID, session_id=session_id, new_message=user_message
         ):
+            logger.info(f"Runner event: {event}")
             # Extract text from response
             if hasattr(event, "content") and event.content:
                 if hasattr(event.content, "parts") and event.content.parts:
                     for part in event.content.parts:
                         if hasattr(part, "text") and part.text:
+                            logger.info(f"Event part text: {part.text}")
                             response_text += part.text
 
         # Update message count

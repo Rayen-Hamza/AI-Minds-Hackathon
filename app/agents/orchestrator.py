@@ -264,7 +264,7 @@ root_agent = Agent(
     model=LiteLlm(
         model=f"openai/{settings.llm_model}",
         api_base=settings.llm_base_url,
-        api_key="dummy",
+        api_key=settings.llm_api_key or "dummy",
     ),
     description="Orchestrator agent with memory-enhanced conversation capabilities. Routes to specialized agents and maintains user context.",
     instruction="""You are a memory-aware orchestrator agent. You have access to user profile information and past conversation history.
@@ -276,12 +276,40 @@ Memory Context:
 - Respect user preferences (e.g., communication style, interests)
 
 Routing Strategy:
-- Search/find content → delegate to qdrant_agent
+- Search/find content (photos, images, text, audio, documents) → delegate to qdrant_agent IMMEDIATELY
 - Entity, person, event, graph questions → delegate to neo4j_agent
 - System status → use get_system_status
 - Help/capabilities → use get_capabilities
 
-Be conversational, helpful, and leverage memory context to provide personalized responses.""",
+MANDATORY DELEGATION PROTOCOL:
+ANY query asking to find, search, show, retrieve, or locate content MUST be delegated to qdrant_agent using AgentTool.
+NO EXCEPTIONS. NO CLARIFYING QUESTIONS. NO EXPLANATIONS.
+
+Examples of queries that MUST delegate to qdrant_agent:
+- "show me photos of cats" → DELEGATE to qdrant_agent with query="photos of cats"
+- "find images from yesterday" → DELEGATE to qdrant_agent with query="images from yesterday"
+- "search for documents about AI" → DELEGATE to qdrant_agent with query="documents about AI"
+- "get audio files" → DELEGATE to qdrant_agent with query="audio files"
+- "cat" → DELEGATE to qdrant_agent with query="cat"
+
+CRITICAL Rules:
+1. NEVER ask for directories, paths, file types, or clarifications for search queries. The vector database handles semantic search automatically.
+2. NEVER explain which tool you are using. Just invoke AgentTool(qdrant_agent) immediately.
+3. If qdrant_agent returns no results, inform the user briefly and suggest ingesting content.
+4. Keep responses concise and focused on the user's goal.
+5. Be conversational and leverage memory context for personalized responses.
+
+OUTPUT FORMAT:
+When qdrant_agent returns results:
+- Return EXACTLY what qdrant_agent returned, character for character
+- DO NOT add any text before or after
+- DO NOT add explanations like "Here are the results:"
+- DO NOT add questions like "Is there anything else?"
+- DO NOT modify, summarize, or reformat
+- DO NOT use markdown syntax
+- Just output the raw response and NOTHING ELSE
+
+YOUR ONLY JOB: Route queries correctly. For search → use qdrant_agent. Always.""",
     tools=[
         FunctionTool(func=get_system_status),
         FunctionTool(func=get_capabilities),

@@ -119,7 +119,7 @@ neo4j_agent = Agent(
     model=LiteLlm(
         model=f"openai/{settings.llm_model}",
         api_base=settings.llm_base_url,
-        api_key="dummy",
+        api_key=settings.llm_api_key or "dummy",
     ),
     description="Knowledge graph agent. Looks up entities, person connections, and event causal chains.",
     instruction="""You query a Neo4j knowledge graph. You have 3 tools:
