@@ -72,11 +72,17 @@ class GraphReasoningOrchestrator:
         )
 
         # 2. Entity resolution — collect match quality signals
+        #    Pass entity_types (from spaCy) for type-aware resolution
         resolved_entities: list[str] = []
         match_qualities: list[MatchQuality] = []
-        for entity in decomposed.entities:
+        for idx, entity in enumerate(decomposed.entities):
+            expected_label = (
+                decomposed.entity_types[idx]
+                if idx < len(decomposed.entity_types)
+                else None
+            )
             resolved, quality = self.entity_resolver.resolve_with_quality(
-                entity
+                entity, expected_label=expected_label,
             )
             resolved_entities.append(
                 resolved["name"] if resolved else entity

@@ -80,17 +80,27 @@ class EntityResolver:
 
     # ── Resolution ───────────────────────────────────────────────────
 
-    def resolve(self, mention: str) -> dict | None:
+    def resolve(self, mention: str, expected_label: str | None = None) -> dict | None:
         """Resolve a text mention to a graph entity (backward compat)."""
-        entity, _ = self.resolve_with_quality(mention)
+        entity, _ = self.resolve_with_quality(mention, expected_label=expected_label)
         return entity
 
     def resolve_with_quality(
-        self, mention: str
+        self,
+        mention: str,
+        *,
+        expected_label: str | None = None,
     ) -> tuple[dict | None, MatchQuality]:
         """
         Resolve a text mention to a graph entity **and** report how
         strong the match was.
+
+        Args:
+            mention: The text mention to resolve.
+            expected_label: If provided (e.g. ``"Person"``), prefer cache
+                entries whose ``label`` matches.  An exact-name match on the
+                wrong label still succeeds, but a fuzzy/substring match is
+                skipped if a better-typed candidate exists.
 
         Returns:
             ``(entity_dict, MatchQuality)`` — entity is ``None`` on miss.
@@ -104,14 +114,19 @@ class EntityResolver:
         if hit is not None:
             return hit, MatchQuality.EXACT
 
-        # 2. Fuzzy match
+        # 2. Fuzzy match — optionally prefer same-label candidates
         best_match: dict | None = None
         best_score = 0.0
         for cached_name, entity in self._entity_cache.items():
             score = SequenceMatcher(
                 None, mention_lower, cached_name
             ).ratio()
-            if score > best_score and score > _FUZZY_THRESHOLD:
+            if score <= _FUZZY_THRESHOLD:
+                continue
+            # Type-aware boost: same label gets +0.05 bonus
+            if expected_label and entity.get("label") == expected_label:
+                score = min(score + 0.05, 1.0)
+            if score > best_score:
                 best_score = score
                 best_match = entity
 
@@ -119,14 +134,23 @@ class EntityResolver:
             self._entity_cache[mention_lower] = best_match
             return best_match, MatchQuality.FUZZY
 
-        # 3. Substring match
+        # 3. Substring match — prefer same-label candidates
         if len(mention_lower) >= _MIN_SUBSTRING_LEN:
+            typed_hit: dict | None = None
+            untyped_hit: dict | None = None
             for cached_name, entity in self._entity_cache.items():
                 if (
                     mention_lower in cached_name
                     or cached_name in mention_lower
                 ):
-                    return entity, MatchQuality.SUBSTRING
+                    if expected_label and entity.get("label") == expected_label:
+                        typed_hit = entity
+                        break  # best possible substring
+                    if untyped_hit is None:
+                        untyped_hit = entity
+            substring_hit = typed_hit or untyped_hit
+            if substring_hit is not None:
+                return substring_hit, MatchQuality.SUBSTRING
 
         return None, MatchQuality.MISS
 

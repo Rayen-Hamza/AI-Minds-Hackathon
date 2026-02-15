@@ -31,6 +31,9 @@ class DecomposedQuery:
     aggregation_fn: str | None
     hop_limit: int
     confidence: float
+    # Parallel list: entity_types[i] is the Neo4j label for entities[i].
+    # Empty when spaCy is unavailable (falls back to label-agnostic path).
+    entity_types: list[str] = field(default_factory=list)
 
 
 @dataclass

@@ -14,6 +14,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.models.models import TextChunk
 from app.config import settings
 from app.services.storage.content_hasher import get_content_hasher
+from app.services.label_mapping import TypedEntity
 from .entity_extractor import get_entity_extractor
 from .pdf_processor import get_pdf_processor
 
@@ -79,6 +80,32 @@ class TextProcessor:
             # Fallback: return whole text as single chunk
             return [text]
 
+    def _extract_typed_entities(self, text: str) -> tuple[list[str], list[dict]]:
+        """Extract entities using spaCy, returning both flat and typed lists.
+
+        Returns:
+            ``(flat_names, typed_dicts)`` where ``typed_dicts`` contains
+            ``{"text": ..., "type": ..., "confidence": ...}`` entries
+            compatible with ``GraphUpdater.ingest_document``.
+        """
+        labeled = self.entity_extractor.extract_entities_with_labels(text)
+        if not labeled:
+            return [], []
+
+        seen: set[str] = set()
+        flat: list[str] = []
+        typed: list[dict] = []
+        for ent in labeled:
+            key = ent["text"].lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            flat.append(ent["text"])
+            te = TypedEntity.from_spacy(ent["text"], ent["label"])
+            typed.append(te.to_entity_payload_dict())
+
+        return flat, typed
+
     def process_text_file(
         self, file_path: str | Path, custom_tags: Optional[list[str]] = None
     ) -> list[TextChunk]:
@@ -132,8 +159,8 @@ class TextProcessor:
             # Process each chunk
             text_chunks = []
             for idx, chunk_text in enumerate(chunks):
-                # Extract entities from this chunk
-                entities = self.entity_extractor.extract_entities(chunk_text)
+                # Extract typed entities from this chunk
+                entities, typed = self._extract_typed_entities(chunk_text)
 
                 # Create TextChunk object
                 text_chunk = TextChunk(
@@ -148,6 +175,7 @@ class TextProcessor:
                     last_modified=last_modified,
                     tags=custom_tags or [],
                     extracted_entities=entities,
+                    typed_entities=typed,
                 )
 
                 text_chunks.append(text_chunk)
@@ -202,8 +230,8 @@ class TextProcessor:
             # Process each chunk
             text_chunks = []
             for idx, chunk_text in enumerate(chunks):
-                # Extract entities
-                entities = self.entity_extractor.extract_entities(chunk_text)
+                # Extract typed entities
+                entities, typed = self._extract_typed_entities(chunk_text)
 
                 text_chunk = TextChunk(
                     text=chunk_text,
@@ -217,6 +245,7 @@ class TextProcessor:
                     last_modified=now,
                     tags=custom_tags or [],
                     extracted_entities=entities,
+                    typed_entities=typed,
                 )
 
                 text_chunks.append(text_chunk)

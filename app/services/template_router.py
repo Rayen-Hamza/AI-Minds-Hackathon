@@ -98,8 +98,13 @@ class TemplateRouter:
         if slot_name == "end_time" and query.time_range:
             return query.time_range[1].isoformat()
 
-        # Node label
+        # Node label — prefer spaCy-derived entity type if available
         if slot_name == "node_label":
+            # 1. If entity_types were populated by spaCy, use the first one
+            if query.entity_types:
+                return query.entity_types[0]
+
+            # 2. Fall back to keyword matching in entity text
             label_map = {
                 "person": "Person",
                 "people": "Person",
@@ -113,6 +118,10 @@ class TemplateRouter:
                 "concepts": "Concept",
                 "organization": "Organization",
                 "organizations": "Organization",
+                "location": "Location",
+                "locations": "Location",
+                "event": "Event",
+                "events": "Event",
             }
             for entity in query.entities:
                 mapped = label_map.get(entity.lower())

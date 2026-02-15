@@ -224,17 +224,20 @@ class EntityExtractor:
 _entity_extractor: Optional[EntityExtractor] = None
 
 
-def get_entity_extractor(model_name: str = "en_core_web_sm") -> EntityExtractor:
+def get_entity_extractor(model_name: str | None = None) -> EntityExtractor:
     """
     Get or create global EntityExtractor instance.
 
     Args:
-        model_name: spaCy model name
+        model_name: spaCy model name (defaults to ``settings.spacy_model``)
 
     Returns:
         EntityExtractor instance
     """
     global _entity_extractor
     if _entity_extractor is None:
+        if model_name is None:
+            from app.config import settings
+            model_name = settings.spacy_model
         _entity_extractor = EntityExtractor(model_name)
     return _entity_extractor

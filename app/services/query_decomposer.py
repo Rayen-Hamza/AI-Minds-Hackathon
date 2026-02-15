@@ -2,11 +2,39 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timedelta
 
 from app.models.reasoning import DecomposedQuery, ReasoningType
 from app.services.confidence import ConfidenceScorer, ConfidenceSignals
+from app.services.label_mapping import TypedEntity
+
+logger = logging.getLogger(__name__)
+
+# ── Lazy spaCy loader (graceful degradation) ─────────────────────────
+
+_spacy_extractor = None  # type: ignore[assignment]
+_spacy_attempted = False
+
+
+def _get_spacy_extractor():
+    """Return the global ``EntityExtractor`` or ``None`` if unavailable."""
+    global _spacy_extractor, _spacy_attempted
+    if _spacy_attempted:
+        return _spacy_extractor
+    _spacy_attempted = True
+    try:
+        from app.services.processing.entity_extractor import get_entity_extractor
+
+        _spacy_extractor = get_entity_extractor()
+        # Force model load so we catch errors early
+        _ = _spacy_extractor.nlp
+        logger.info("QueryDecomposer: spaCy NER available")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("QueryDecomposer: spaCy NER unavailable (%s), using regex fallback", exc)
+        _spacy_extractor = None
+    return _spacy_extractor
 
 
 class QueryDecomposer:
@@ -118,7 +146,16 @@ class QueryDecomposer:
 
         time_range = self._extract_time_range(query_lower)
         agg_fn = self._detect_aggregation(query_lower)
-        entities = self._extract_entities(query)
+
+        # Try spaCy first — typed entities with Neo4j labels
+        typed_entities = self._extract_entities_spacy(query)
+        if typed_entities:
+            entities = [te.text for te in typed_entities]
+            entity_types = [te.neo4j_label for te in typed_entities]
+        else:
+            entities = self._extract_entities(query)
+            entity_types = []
+
         reasoning_type, confidence = self._classify_intent(
             query_lower, time_range, agg_fn, entities
         )
@@ -133,6 +170,7 @@ class QueryDecomposer:
             aggregation_fn=agg_fn,
             hop_limit=hop_limit,
             confidence=confidence,
+            entity_types=entity_types,
         )
 
     # ── Private helpers ──────────────────────────────────────────────
@@ -243,6 +281,37 @@ class QueryDecomposer:
                 i += 1
 
         return entities
+
+    def _extract_entities_spacy(self, query: str) -> list[TypedEntity]:
+        """Extract entities via spaCy NER, returning typed entities.
+
+        Returns an empty list if spaCy is unavailable — caller will
+        fall back to the regex-based ``_extract_entities``.
+        """
+        extractor = _get_spacy_extractor()
+        if extractor is None:
+            return []
+
+        try:
+            labeled = extractor.extract_entities_with_labels(query)
+        except Exception:  # noqa: BLE001
+            logger.debug("spaCy extraction failed, falling back to regex")
+            return []
+
+        if not labeled:
+            return []
+
+        # De-duplicate while preserving order
+        seen: set[str] = set()
+        result: list[TypedEntity] = []
+        for ent in labeled:
+            key = ent["text"].lower()
+            if key in seen or key in self._COMMON_NON_ENTITIES:
+                continue
+            seen.add(key)
+            result.append(TypedEntity.from_spacy(ent["text"], ent["label"]))
+
+        return result
 
     def _extract_time_range(
         self, query: str
