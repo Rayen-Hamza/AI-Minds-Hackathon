@@ -194,11 +194,37 @@ def analyze_request(user_query: str) -> Dict[str, Any]:
             intent = "information"
             recommended_agent = "orchestrator"
 
+        # Ingestion keywords — delegate to neo4j_agent
+        ingest_keywords = [
+            "ingest",
+            "injest",
+            "import",
+            "add to graph",
+            "add document",
+            "load file",
+            "load document",
+            "index file",
+            "index document",
+            "store in graph",
+            "populate graph",
+        ]
+        if any(keyword in query_lower for keyword in ingest_keywords):
+            intent = "ingestion"
+            recommended_agent = "neo4j_agent"
+
         # Knowledge graph keywords
         graph_keywords = [
-            "graph", "entity", "relationship", "connected", "path between",
-            "knowledge graph", "neo4j", "topic cluster", "who knows",
-            "related to", "linked to",
+            "graph",
+            "entity",
+            "relationship",
+            "connected",
+            "path between",
+            "knowledge graph",
+            "neo4j",
+            "topic cluster",
+            "who knows",
+            "related to",
+            "linked to",
         ]
         if any(keyword in query_lower for keyword in graph_keywords):
             intent = "graph_query"
@@ -240,47 +266,12 @@ root_agent = Agent(
         api_base=settings.llm_base_url,
         api_key="dummy",
     ),
-    description="""You are the main orchestrator agent for a multimodal RAG (Retrieval-Augmented Generation) system.
-    You coordinate tasks, manage conversations, and delegate to specialized agents when needed.
-
-    You work with a team of specialized agents:
-    - Qdrant Agent: Expert in vector database operations and semantic search
-    - Neo4j Agent: Expert in knowledge graph queries, entity resolution, relationship traversal, and graph analytics
-
-    Your responsibilities:
-    1. Understand user requests and route them appropriately
-    2. Provide system information and status updates
-    3. Explain system capabilities
-    4. Coordinate between different agents for complex tasks
-    5. Maintain conversation context and provide helpful responses
-
-    The system handles multimodal content (text, images, audio) using a unified text-centric embedding approach.""",
-    instruction="""You are a helpful, professional orchestrator agent.
-
-    When users ask questions:
-    1. Determine if it's a search/retrieval task → delegate to qdrant_agent
-    2. For knowledge graph queries (entities, relationships, paths, topics, graph analytics) → delegate to neo4j_agent
-    3. For system status/info → use get_system_status
-    4. For capabilities/help → use get_capabilities
-    5. For general conversation → respond directly with helpful information
-
-    Guidelines:
-    - Be friendly and professional
-    - Explain what you're doing when delegating to other agents
-    - Provide context about the system when relevant
-    - If you're unsure, use analyze_request to help determine the best approach
-    - Always aim to be helpful and provide complete answers
-    You only have access to the tools provided. Do not attempt to access external resources or databases directly.
-    When delegating to the qdrant_agent:
-    - Clearly pass the search query
-    - Let the qdrant_agent handle the technical details
-    - Summarize results in a user-friendly way if needed
-    When delegating to the neo4j_agent:
-    - Use it for entity lookups, relationship exploration, path finding, and graph analytics
-    - Let the neo4j_agent handle Cypher execution and entity resolution
-    - Summarize graph results in a user-friendly way if needed
-
-    You have access to system information and can coordinate with specialized agents.""",
+    description="Orchestrator agent. Routes to qdrant_agent (search) or neo4j_agent (knowledge graph).",
+    instruction="""Route requests:
+- Search/find content → delegate to qdrant_agent
+- Entity, person, event, graph questions → delegate to neo4j_agent
+- System status → use get_system_status
+- Help → use get_capabilities""",
     tools=[
         FunctionTool(func=get_system_status),
         FunctionTool(func=get_capabilities),

@@ -184,11 +184,14 @@ class ImageProcessor:
             for source_text in (caption, ocr_text):
                 if not source_text:
                     continue
-                labeled = self.entity_extractor.extract_entities_with_labels(source_text)
+                labeled = self.entity_extractor.extract_entities_with_labels(
+                    source_text
+                )
                 for ent in labeled:
                     entities.append(ent["text"])
                     te = TypedEntity.from_spacy(ent["text"], ent["label"])
-                    typed_entities.append(te.to_entity_payload_dict())
+                    if te is not None:
+                        typed_entities.append(te.to_entity_payload_dict())
 
             # Remove duplicates
             entities = list(dict.fromkeys(entities))

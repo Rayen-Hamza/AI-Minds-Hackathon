@@ -43,6 +43,16 @@ SPACY_TO_NEO4J: dict[str, str] = {
     "NORP": "Concept",
 }
 
+# spaCy labels that should be SKIPPED entirely — they produce noisy
+# nodes (numbers, percentages, ordinals, etc.).
+SKIP_SPACY_LABELS: set[str] = {
+    "CARDINAL",
+    "ORDINAL",
+    "QUANTITY",
+    "PERCENT",
+    "MONEY",
+}
+
 # Reverse index — Neo4j label → list of spaCy labels that map to it
 NEO4J_TO_SPACY: dict[str, list[str]] = {}
 for _spacy, _neo4j in SPACY_TO_NEO4J.items():
@@ -53,8 +63,13 @@ for _spacy, _neo4j in SPACY_TO_NEO4J.items():
 DEFAULT_NEO4J_LABEL = "Topic"
 
 
-def neo4j_label(spacy_label: str) -> str:
-    """Map a spaCy entity label to the corresponding Neo4j node label."""
+def neo4j_label(spacy_label: str) -> str | None:
+    """Map a spaCy entity label to the corresponding Neo4j node label.
+
+    Returns ``None`` for labels that should be skipped (numerics, etc.).
+    """
+    if spacy_label in SKIP_SPACY_LABELS:
+        return None
     return SPACY_TO_NEO4J.get(spacy_label, DEFAULT_NEO4J_LABEL)
 
 
@@ -87,6 +102,7 @@ def spacy_label_confidence(spacy_label: str) -> float:
 
 # ── Typed entity dataclass ──────────────────────────────────────────
 
+
 @dataclass(frozen=True, slots=True)
 class TypedEntity:
     """An entity with its text, spaCy label, Neo4j label, and confidence."""
@@ -97,12 +113,18 @@ class TypedEntity:
     confidence: float
 
     @classmethod
-    def from_spacy(cls, text: str, spacy_label: str) -> TypedEntity:
-        """Construct from spaCy extraction output."""
+    def from_spacy(cls, text: str, spacy_label: str) -> TypedEntity | None:
+        """Construct from spaCy extraction output.
+
+        Returns ``None`` for labels that should be skipped.
+        """
+        mapped = neo4j_label(spacy_label)
+        if mapped is None:
+            return None
         return cls(
             text=text,
             spacy_label=spacy_label,
-            neo4j_label=neo4j_label(spacy_label),
+            neo4j_label=mapped,
             confidence=spacy_label_confidence(spacy_label),
         )
 

@@ -53,7 +53,8 @@ class AudioProcessor:
             seen.add(key)
             flat.append(ent["text"])
             te = TypedEntity.from_spacy(ent["text"], ent["label"])
-            typed.append(te.to_entity_payload_dict())
+            if te is not None:
+                typed.append(te.to_entity_payload_dict())
 
         return flat, typed
 

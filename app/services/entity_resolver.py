@@ -58,8 +58,14 @@ class EntityResolver:
                     self._entity_cache[alias.lower()] = entry
 
             # Simple-name labels
-            for label in ("Topic", "Concept", "Organization", "Project",
-                          "Event", "Location"):
+            for label in (
+                "Topic",
+                "Concept",
+                "Organization",
+                "Project",
+                "Event",
+                "Location",
+            ):
                 result = session.run(
                     f"MATCH (n:{label}) "
                     f"RETURN n.id AS id, n.name AS name, '{label}' AS label"
@@ -118,9 +124,7 @@ class EntityResolver:
         best_match: dict | None = None
         best_score = 0.0
         for cached_name, entity in self._entity_cache.items():
-            score = SequenceMatcher(
-                None, mention_lower, cached_name
-            ).ratio()
+            score = SequenceMatcher(None, mention_lower, cached_name).ratio()
             if score <= _FUZZY_THRESHOLD:
                 continue
             # Type-aware boost: same label gets +0.05 bonus
@@ -139,10 +143,7 @@ class EntityResolver:
             typed_hit: dict | None = None
             untyped_hit: dict | None = None
             for cached_name, entity in self._entity_cache.items():
-                if (
-                    mention_lower in cached_name
-                    or cached_name in mention_lower
-                ):
+                if mention_lower in cached_name or cached_name in mention_lower:
                     if expected_label and entity.get("label") == expected_label:
                         typed_hit = entity
                         break  # best possible substring
@@ -170,6 +171,9 @@ class EntityResolver:
         props["id"] = new_id
         props["name"] = mention
         props["mention_count"] = 1
+        # Person nodes use canonical_name as primary name field
+        if label == "Person":
+            props["canonical_name"] = mention
 
         with self.driver.session() as session:
             session.run(f"CREATE (n:{label} $props)", props=props)

@@ -32,7 +32,9 @@ def _get_spacy_extractor():
         _ = _spacy_extractor.nlp
         logger.info("QueryDecomposer: spaCy NER available")
     except Exception as exc:  # noqa: BLE001
-        logger.warning("QueryDecomposer: spaCy NER unavailable (%s), using regex fallback", exc)
+        logger.warning(
+            "QueryDecomposer: spaCy NER unavailable (%s), using regex fallback", exc
+        )
         _spacy_extractor = None
     return _spacy_extractor
 
@@ -124,19 +126,79 @@ class QueryDecomposer:
     ]
 
     # Non-entity capitalised words to ignore
-    _COMMON_NON_ENTITIES = frozenset({"i", "the", "a", "an", "my", "what", "how",
-                                       "who", "where", "when", "why", "which",
-                                       "is", "are", "was", "were", "do", "does",
-                                       "did", "can", "could", "will", "would",
-                                       "should", "have", "has", "had", "been",
-                                       "being", "it", "its", "this", "that",
-                                       "these", "those", "and", "or", "but",
-                                       "not", "no", "yes", "to", "of", "in",
-                                       "on", "at", "for", "with", "from", "by",
-                                       "about", "between", "through", "after",
-                                       "before", "during", "all", "each", "any",
-                                       "some", "more", "most", "much", "many",
-                                       "show", "find", "get", "me", "tell"})
+    _COMMON_NON_ENTITIES = frozenset(
+        {
+            "i",
+            "the",
+            "a",
+            "an",
+            "my",
+            "what",
+            "how",
+            "who",
+            "where",
+            "when",
+            "why",
+            "which",
+            "is",
+            "are",
+            "was",
+            "were",
+            "do",
+            "does",
+            "did",
+            "can",
+            "could",
+            "will",
+            "would",
+            "should",
+            "have",
+            "has",
+            "had",
+            "been",
+            "being",
+            "it",
+            "its",
+            "this",
+            "that",
+            "these",
+            "those",
+            "and",
+            "or",
+            "but",
+            "not",
+            "no",
+            "yes",
+            "to",
+            "of",
+            "in",
+            "on",
+            "at",
+            "for",
+            "with",
+            "from",
+            "by",
+            "about",
+            "between",
+            "through",
+            "after",
+            "before",
+            "during",
+            "all",
+            "each",
+            "any",
+            "some",
+            "more",
+            "most",
+            "much",
+            "many",
+            "show",
+            "find",
+            "get",
+            "me",
+            "tell",
+        }
+    )
 
     # ── Public API ───────────────────────────────────────────────────
 
@@ -196,9 +258,7 @@ class QueryDecomposer:
         signals.patterns_checked = total_patterns
 
         # Count causal matches
-        causal_hits = sum(
-            1 for p in self.CAUSAL_INDICATORS if re.search(p, query)
-        )
+        causal_hits = sum(1 for p in self.CAUSAL_INDICATORS if re.search(p, query))
         if causal_hits:
             signals.pattern_matches = causal_hits
             return ReasoningType.CAUSAL, scorer.classification_confidence(signals)
@@ -219,7 +279,9 @@ class QueryDecomposer:
         if agg_fn:
             signals.pattern_matches = 1
             if len(entities) >= 2:
-                return ReasoningType.COMPARISON, scorer.classification_confidence(signals)
+                return ReasoningType.COMPARISON, scorer.classification_confidence(
+                    signals
+                )
             return ReasoningType.AGGREGATION, scorer.classification_confidence(signals)
 
         # Count exploration matches
@@ -240,7 +302,9 @@ class QueryDecomposer:
             # Entity found but no specific intent pattern → entity lookup
             signals.pattern_matches = 0
             signals.is_fallback_classification = False
-            return ReasoningType.ENTITY_LOOKUP, scorer.classification_confidence(signals)
+            return ReasoningType.ENTITY_LOOKUP, scorer.classification_confidence(
+                signals
+            )
 
         # True fallback — nothing matched
         signals.is_fallback_classification = True
@@ -309,13 +373,13 @@ class QueryDecomposer:
             if key in seen or key in self._COMMON_NON_ENTITIES:
                 continue
             seen.add(key)
-            result.append(TypedEntity.from_spacy(ent["text"], ent["label"]))
+            te = TypedEntity.from_spacy(ent["text"], ent["label"])
+            if te is not None:
+                result.append(te)
 
         return result
 
-    def _extract_time_range(
-        self, query: str
-    ) -> tuple[datetime, datetime] | None:
+    def _extract_time_range(self, query: str) -> tuple[datetime, datetime] | None:
         """Parse temporal expressions into ``(start, end)`` tuples."""
         now = datetime.now()
 
