@@ -330,7 +330,7 @@ LOG_LEVEL=INFO
 <tr>
 <td align="center">
   <strong>CrèmeTartinéDangereuse</strong><br/>
-  Built with ❤️ and ☕
+  Built with 💔 and ☕
 </td>
 </tr>
 </table>
