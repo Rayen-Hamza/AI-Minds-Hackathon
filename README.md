@@ -329,7 +329,7 @@ LOG_LEVEL=INFO
 <table>
 <tr>
 <td align="center">
-  <strong>AI Minds 2026</strong><br/>
+  <strong>CrèmeTartinéDangereuse</strong><br/>
   Built with ❤️ and ☕
 </td>
 </tr>
