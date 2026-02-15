@@ -1,0 +1,379 @@
+.window-content {
+  overflow-y: auto;
+  height: calc(100% - 20px);
+}
+
+table > tbody > tr > * {
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+fieldset button {
+  margin: 0 5px;
+}
+
+fieldset button:first-of-type {
+  margin-left: 0;
+}
+
+fieldset button:last-of-type {
+  margin-right: 0;
+}
+
+/* ===== Modern Polish (retro theme preserved) ===== */
+
+/* Smooth transitions for interactive elements */
+button {
+  transition: filter 0.12s ease, transform 0.08s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Subtle hover glow on buttons */
+button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* Title bar improvements */
+.title-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.title-bar-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Chat container */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 100%;
+}
+
+/* Message styling */
+.message {
+  flex-shrink: 0;
+  user-select: text;
+  animation: messageSlideIn 0.25s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-content {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.message-content p {
+  margin: 4px 0;
+}
+
+.message-content p:first-child {
+  margin-top: 0;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content pre {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 8px;
+  border-radius: 2px;
+  overflow-x: auto;
+  font-size: 0.9em;
+}
+
+.message-content code {
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 4px;
+  font-size: 0.9em;
+}
+
+.message-content pre code {
+  background: none;
+  padding: 0;
+}
+
+/* User vs assistant message differentiation */
+.message-bubble {
+  padding: 8px 12px;
+  border-radius: 2px;
+  max-width: 100%;
+}
+
+.message-bubble--user {
+  background: #e8f0fe;
+  border: 1px solid #c5d8f0;
+}
+
+.message-bubble--klippy {
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+}
+
+/* Chat input area */
+.chat-input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 0 4px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 8px;
+}
+
+.chat-input-area textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 23px;
+  max-height: 120px;
+  transition: border-color 0.15s ease;
+}
+
+.chat-input-area textarea:focus {
+  border-color: #0078d4;
+  outline: none;
+}
+
+.chat-input-area .send-btn {
+  align-self: flex-end;
+  height: 23px;
+  min-width: 60px;
+}
+
+/* Status indicator */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  color: #666;
+  padding: 4px 0;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #888;
+  display: inline-block;
+}
+
+.status-dot--thinking {
+  background: #f0ad4e;
+  animation: statusPulse 1.2s ease-in-out infinite;
+}
+
+.status-dot--responding {
+  background: #5cb85c;
+  animation: statusPulse 0.8s ease-in-out infinite;
+}
+
+.status-dot--idle {
+  background: #5cb85c;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Chats history list */
+.chats-container {
+  padding: 16px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chats-header h1 {
+  margin: 0;
+}
+
+.chats-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Settings layout improvements */
+.settings-fieldset {
+  margin-bottom: 0;
+}
+
+.settings-fieldset legend {
+  font-weight: bold;
+}
+
+/* Bottom bar */
+.bubble-bottom-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Bubble window structure */
+.bubble-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.bubble-container > .window-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Tabs polish */
+menu[role="tablist"] {
+  margin-bottom: 0 !important;
+}
+
+li[role="tab"] {
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  user-select: none;
+}
+
+/* Scrollbar styling (subtle, retro-compatible) */
+.window-content::-webkit-scrollbar {
+  width: 16px;
+}
+
+.window-content::-webkit-scrollbar-track {
+  background: #c0c0c0;
+  border-left: 1px solid #808080;
+}
+
+.window-content::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border: 1px outset #dfdfdf;
+  border-right-color: #808080;
+  border-bottom-color: #808080;
+}
+
+/* Sunken panel for model details etc. */
+.sunken-panel {
+  overflow: auto;
+}
+
+/* Tooltip-style helper text */
+.helper-text {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* Focus ring for accessibility */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px dotted #333;
+  outline-offset: 1px;
+}
+
+/* Links */
+a {
+  color: #0066cc;
+}
+
+a:hover {
+  color: #0044aa;
+  text-decoration: underline;
+}
+
+a:visited {
+  color: #551a8b;
+}
+
+/* Welcome message content */
+.welcome-content {
+  line-height: 1.5;
+}
+
+.welcome-content p {
+  margin: 8px 0;
+}
+
+.welcome-content strong {
+  font-size: 1.1em;
+}
+
+/* Download progress area */
+.download-status {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.download-status p {
+  margin: 4px 0;
+}
+
+/* Model details section */
+.model-details {
+  margin-top: 16px;
+  padding: 12px;
+}
+
+.model-details strong {
+  font-size: 1.05em;
+}
+
+.model-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* Error content */
+.error-content {
+  line-height: 1.5;
+}
+
+.error-content pre {
+  background: #fff0f0;
+  border: 1px solid #ffcccc;
+  padding: 8px;
+  margin-top: 8px;
+  overflow-x: auto;
+  font-size: 0.9em;
+}
