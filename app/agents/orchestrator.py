@@ -220,7 +220,11 @@ def analyze_request(user_query: str) -> Dict[str, Any]:
 
 root_agent = Agent(
     name="orchestrator",
-    model=LiteLlm(model=f"openai/{settings.llm_model}", api_base=settings.llm_base_url, api_key="dummy"),
+    model=LiteLlm(
+        model=f"openai/{settings.llm_model}",
+        api_base=settings.llm_base_url,
+        api_key="dummy",
+    ),
     description="""You are the main orchestrator agent for a multimodal RAG (Retrieval-Augmented Generation) system.
     You coordinate tasks, manage conversations, and delegate to specialized agents when needed.
     

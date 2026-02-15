@@ -399,7 +399,11 @@ from ..config import settings as qdrant_settings
 
 qdrant_agent = Agent(
     name="qdrant_agent",
-    model=LiteLlm(model=f"openai/{qdrant_settings.llm_model}", api_base=qdrant_settings.llm_base_url, api_key="dummy"),
+    model=LiteLlm(
+        model=f"openai/{qdrant_settings.llm_model}",
+        api_base=qdrant_settings.llm_base_url,
+        api_key="dummy",
+    ),
     description="""You are a Qdrant vector database specialist. 
     You help users search for information, ingest content, manage collections, and retrieve data from the vector database.
     You have access to semantic search capabilities, directory ingestion, and can filter by content type, tags, and source files.
