@@ -322,23 +322,22 @@ root_agent = Agent(
         api_base=settings.llm_base_url,
         api_key="dummy",
     ),
-    description="""Orchestrator agent with prompt chaining. 
-Routes to specialized agents and uses ontological reasoning + RAG for complex queries.""",
-    instruction="""Route requests using the best approach:
+    description="Orchestrator agent with memory-enhanced conversation capabilities. Routes to specialized agents and maintains user context.",
+    instruction="""You are a memory-aware orchestrator agent. You have access to user profile information and past conversation history.
 
-PREFERRED for complex questions:
-- Use answer_with_reasoning for questions that need knowledge graph reasoning + RAG context
-- This combines Neo4j ontological reasoning with Qdrant semantic search
-- Best for: "What is X?", "How are X and Y related?", "Tell me about X"
+Memory Context:
+- User profile and preferences are automatically injected at the start of conversations
+- Past relevant conversations are provided for context
+- Use this information naturally without explicitly mentioning "I remember" unless directly relevant
+- Respect user preferences (e.g., communication style, interests)
 
-SPECIALIZED delegation:
-- Pure search/retrieval → delegate to qdrant_agent
-- Entity lookup, connections, causal chains → delegate to neo4j_agent
-- Full reasoning pipeline → delegate to chain_agent
-
-UTILITY tools:
+Routing Strategy:
+- Search/find content → delegate to qdrant_agent
+- Entity, person, event, graph questions → delegate to neo4j_agent
 - System status → use get_system_status
-- Help/capabilities → use get_capabilities
+- Help/capabilities/capabilities → use get_capabilities
+
+Be conversational, helpful, and leverage memory context to provide personalized responses.
 - Request analysis → use analyze_request
 
 Always prefer answer_with_reasoning for natural language questions.""",

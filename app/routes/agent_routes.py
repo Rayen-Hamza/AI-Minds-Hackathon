@@ -15,6 +15,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 
 from ..agents import root_agent, qdrant_agent, neo4j_agent, run_prompt_chain
+from ..memory import record_event, get_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agents"])
@@ -88,7 +89,7 @@ class SessionInfo(BaseModel):
 @router.post("/chat", response_model=AgentResponse)
 async def chat_with_agent(request: AgentRequest):
     """
-    Send a message to an agent and get a response.
+    Send a message to an agent and get a response with memory-enriched context.
 
     Args:
         request: Agent request with message, optional session_id, and agent type
@@ -118,8 +119,23 @@ async def chat_with_agent(request: AgentRequest):
             )
             active_sessions[session_id] = {"agent": agent.name, "message_count": 0}
 
-        # Create user message
-        user_message = Content(role="user", parts=[Part(text=request.message)])
+        # MEMORY ENRICHMENT: Get context before processing
+        memory_context = get_context(
+            query=request.message,
+            max_events=5,
+            session_id=session_id,
+            use_semantic_search=True
+        )
+
+        # If we have memory context, prepend it to the message
+        enriched_message = request.message
+        if memory_context:
+            logger.info(f"Enriching message with memory context (session: {session_id})")
+            # Inject memory context as a system-level instruction
+            enriched_message = f"{memory_context}\n\nUser query: {request.message}"
+
+        # Create user message with enriched context
+        user_message = Content(role="user", parts=[Part(text=enriched_message)])
 
         # Run agent and collect response
         response_text = ""
@@ -143,6 +159,19 @@ async def chat_with_agent(request: AgentRequest):
             response_text = (
                 "I processed your request, but didn't generate a text response."
             )
+
+        # MEMORY RECORDING: Record the conversation turn after response
+        try:
+            record_event(
+                user_message=request.message,
+                assistant_response=response_text,
+                session_id=session_id,
+                metadata={"agent": agent.name}
+            )
+            logger.debug(f"Recorded conversation event for session {session_id}")
+        except Exception as mem_err:
+            logger.warning(f"Failed to record memory event: {mem_err}")
+            # Don't fail the request if memory recording fails
 
         # Try to extract metadata from prompt chain if available
         source_files = []
@@ -285,3 +314,91 @@ async def list_agents():
             },
         ]
     }
+
+
+# ============================================================================
+# Memory Management Routes
+# ============================================================================
+
+
+@router.get("/memory/stats")
+async def get_memory_stats():
+    """
+    Get memory system statistics including profile and event counts.
+
+    Returns:
+        Dictionary with memory statistics
+    """
+    try:
+        from ..memory import MemoryService
+
+        service = MemoryService()
+        stats = service.get_stats()
+
+        return {
+            "success": True,
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting memory stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/memory/profile")
+async def get_user_profile():
+    """
+    Get the current user profile.
+
+    Returns:
+        User profile with properties and preferences
+    """
+    try:
+        from ..memory.profile_store import ProfileStore
+
+        store = ProfileStore()
+        profile = store.load()
+
+        return {
+            "success": True,
+            "profile": {
+                "properties": profile.properties,
+                "preferences": profile.preferences,
+                "updated_at": profile.updated_at.isoformat()
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/memory/clear")
+async def clear_memory(session_id: Optional[str] = None):
+    """
+    Clear memory (profile and/or events).
+
+    Args:
+        session_id: Optional - if provided, only clear events for this session
+
+    Returns:
+        Success message
+    """
+    try:
+        from ..memory import MemoryService
+
+        service = MemoryService()
+        success = service.clear_all(session_id)
+
+        if success:
+            message = f"Memory cleared for session {session_id}" if session_id else "All memory cleared"
+            return {
+                "success": True,
+                "message": message
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to clear memory")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error clearing memory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
