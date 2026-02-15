@@ -11,6 +11,7 @@ from google.adk.models import LiteLlm
 
 from .qdrant_agent import qdrant_agent
 from .neo4j_agent import neo4j_agent
+from .prompt_chain import chain_agent, run_prompt_chain
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,61 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Orchestrator Tools
 # ============================================================================
+
+
+def answer_with_reasoning(user_query: str) -> Dict[str, Any]:
+    """
+    Answer a question using the full prompt chaining pipeline.
+    
+    This tool:
+    1. Enriches the query with ontological reasoning from Neo4j
+    2. Searches Qdrant for relevant RAG context
+    3. Builds a context-limited prompt for the small LLM
+    4. Returns the final answer
+    
+    Use this for complex questions that benefit from knowledge graph reasoning
+    combined with semantic search.
+    
+    Args:
+        user_query: The user's question
+        
+    Returns:
+        Dictionary with the reasoned answer and metadata
+    """
+    try:
+        logger.info(f"Running prompt chain for: {user_query[:50]}...")
+        
+        # Execute the full prompt chaining pipeline
+        result = run_prompt_chain(user_query)
+        
+        if not result.get("success"):
+            return {
+                "success": False,
+                "error": result.get("error", "Unknown error in prompt chain"),
+                "query": user_query,
+            }
+        
+        return {
+            "success": True,
+            "query": user_query,
+            "prompt": result.get("final_prompt", ""),
+            "token_estimate": result.get("token_estimate", 0),
+            "has_graph_reasoning": result.get("has_reasoning", False),
+            "has_rag_context": result.get("has_rag", False),
+            "confidence": result.get("confidence", 0.0),
+            "entities_found": result.get("entities_found", []),
+            "rag_results_count": result.get("rag_results_count", 0),
+            "source_files": result.get("source_files", []),
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in answer_with_reasoning: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "query": user_query,
+            "source_files": [],
+        }
 
 
 def get_system_status() -> Dict[str, Any]:
@@ -266,17 +322,33 @@ root_agent = Agent(
         api_base=settings.llm_base_url,
         api_key="dummy",
     ),
-    description="Orchestrator agent. Routes to qdrant_agent (search) or neo4j_agent (knowledge graph).",
-    instruction="""Route requests:
-- Search/find content → delegate to qdrant_agent
-- Entity, person, event, graph questions → delegate to neo4j_agent
+    description="""Orchestrator agent with prompt chaining. 
+Routes to specialized agents and uses ontological reasoning + RAG for complex queries.""",
+    instruction="""Route requests using the best approach:
+
+PREFERRED for complex questions:
+- Use answer_with_reasoning for questions that need knowledge graph reasoning + RAG context
+- This combines Neo4j ontological reasoning with Qdrant semantic search
+- Best for: "What is X?", "How are X and Y related?", "Tell me about X"
+
+SPECIALIZED delegation:
+- Pure search/retrieval → delegate to qdrant_agent
+- Entity lookup, connections, causal chains → delegate to neo4j_agent
+- Full reasoning pipeline → delegate to chain_agent
+
+UTILITY tools:
 - System status → use get_system_status
-- Help → use get_capabilities""",
+- Help/capabilities → use get_capabilities
+- Request analysis → use analyze_request
+
+Always prefer answer_with_reasoning for natural language questions.""",
     tools=[
+        FunctionTool(func=answer_with_reasoning),
         FunctionTool(func=get_system_status),
         FunctionTool(func=get_capabilities),
         FunctionTool(func=analyze_request),
         AgentTool(agent=qdrant_agent),
         AgentTool(agent=neo4j_agent),
+        AgentTool(agent=chain_agent),
     ],
 )

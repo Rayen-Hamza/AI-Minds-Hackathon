@@ -1,357 +1,403 @@
-# Qdrant Memory Service
+<p align="center">
+  <img src="frontend/src/renderer/images/animations/Default.png" alt="Klippy" width="200"/>
+</p>
 
-A **text-centric multimodal** vector store service for grounded memory and reasoning systems. Handles **text, images, and audio** by converting ALL content to text first, then embedding with a single model into a unified vector space. Built on Qdrant for efficient semantic search with differential updates via content hashing.
+<p align="center">
+  <img src="https://img.shields.io/badge/AI--Minds-Hackathon%202026-blueviolet?style=for-the-badge&logo=robot&logoColor=white" alt="AI Minds Hackathon"/>
+</p>
 
-> **Architecture Philosophy:** "False multimodality" — every modality is converted to text (captions, transcripts, OCR) before embedding. This enables: (1) unified cross-modal search with a single vector, (2) entity extraction and relationship mining across all content types, and (3) knowledge graph construction via Neo4j for reasoning.
+<h1 align="center"> Klippy📎</h1>
 
-## Features
+<p align="center">
+  <em> Paperclips Organized Your Documents Since 1867.<br/>Now They Understand Them.</em>
+</p>
 
-✨ **Text-Centric Multimodal Support**
-- 📝 **Text** (TXT, MD, PDF, code files) → chunked and embedded directly
-- 🖼️ **Images** (PNG, JPG, etc.) → BLIP captioning + Tesseract OCR → text → embedded
-- 🎵 **Audio** (WAV, MP3, etc.) → Whisper transcription → text → embedded
+<p align="center">
+  <strong>A text-centric multimodal RAG system with knowledge graph reasoning for sub-4B LLMs </strong>
+</p>
 
-🔍 **Unified Search**
-- Single vector space for ALL content types (384-dim MiniLM)
-- One query searches text, images, and audio simultaneously
-- Filter by content type: `/search/by-type/{text|image|audio}`
-- Filter by source file or extracted entity
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/FastAPI-0.109+-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/Electron-Forge-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron"/>
+  <img src="https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React"/>
+</p>
 
-⚡ **Smart Processing**
-- Differential updates via content hashing (skip unchanged files)
-- Automatic text chunking with configurable overlap
-- NER entity extraction (spaCy) for knowledge graph construction
-- Relationship extraction (subject → predicate → object triples)
-- BLIP image captioning (Salesforce/blip-image-captioning-base)
-- Whisper speech-to-text (openai/whisper-base)
-- Tesseract OCR for text in images (optional)
+<p align="center">
+  <img src="https://img.shields.io/badge/Qdrant-Vector%20DB-FF6B6B?style=flat-square" alt="Qdrant"/>
+  <img src="https://img.shields.io/badge/Neo4j-Knowledge%20Graph-008CC1?style=flat-square&logo=neo4j&logoColor=white" alt="Neo4j"/>
+  <img src="https://img.shields.io/badge/Ollama-Local%20LLM-000000?style=flat-square" alt="Ollama"/>
+  <img src="https://img.shields.io/badge/Google%20ADK-Agents-4285F4?style=flat-square&logo=google&logoColor=white" alt="Google ADK"/>
+</p>
 
-🏗️ **Architecture**
-- **Single embedding model** — `sentence-transformers/all-MiniLM-L6-v2` (384-dim)
-- **Single Qdrant collection** — `multimodal_embeddings` with one `text_vector`
-- **Unified text extraction layer** — converts any modality to text
-- Strategy Pattern for modality-specific processing
-- Lazy model loading (BLIP, Whisper, spaCy load on first use)
-- HNSW indexing for fast similarity search
-
-## Architecture
-
-```
-                    ┌─────────────────────────────────────────────┐
-                    │              Ingestion Pipeline              │
-                    └──────────────────┬──────────────────────────┘
-                                       │
-              ┌────────────────────────┼────────────────────────┐
-              │                        │                        │
-         ┌────▼────┐            ┌──────▼──────┐          ┌──────▼──────┐
-         │  Text   │            │   Image     │          │   Audio     │
-         │ Files   │            │   Files     │          │   Files     │
-         └────┬────┘            └──────┬──────┘          └──────┬──────┘
-              │                        │                        │
-              │                  ┌─────▼─────┐           ┌─────▼─────┐
-              │                  │   BLIP    │           │  Whisper  │
-              │                  │ Captioning│           │ Transcribe│
-              │                  │  + OCR    │           │           │
-              │                  └─────┬─────┘           └─────┬─────┘
-              │                        │                        │
-              ▼                        ▼                        ▼
-         ┌─────────────────────────────────────────────────────────┐
-         │                    Plain Text                           │
-         └──────────────────────────┬──────────────────────────────┘
-                                    │
-                    ┌───────────────┼───────────────┐
-                    │               │               │
-              ┌─────▼─────┐  ┌─────▼─────┐  ┌──────▼──────┐
-              │  Chunking  │  │   Entity  │  │ Relationship│
-              │  (512 tok) │  │ Extraction│  │  Extraction │
-              │            │  │  (spaCy)  │  │ (S→P→O)    │
-              └─────┬──────┘  └─────┬─────┘  └──────┬──────┘
-                    │               │               │
-                    ▼               │               │
-         ┌──────────────────┐      │               │
-         │  MiniLM-L6-v2   │      │               │
-         │  Text Embedding │      │               │
-         │   (384-dim)     │      │               │
-         └────────┬─────────┘      │               │
-                  │               │               │
-                  ▼               ▼               ▼
-         ┌──────────────────────────────────────────┐
-         │        Qdrant: multimodal_embeddings     │
-         │  ┌────────────────────────────────────┐  │
-         │  │  text_vector (384-dim, COSINE)     │  │
-         │  │  payload: content_type, entities,  │  │
-         │  │  caption, transcript, tags, etc.   │  │
-         │  └────────────────────────────────────┘  │
-         └──────────────────────────────────────────┘
-                  │                         │
-                  ▼                         ▼
-         ┌────────────────┐       ┌─────────────────┐
-         │ Unified Search │       │  Neo4j Graph     │
-         │ (single query  │       │  (entities +     │
-         │  all modalities│       │   relationships) │
-         │  one vector)   │       │   [future]       │
-         └────────────────┘       └─────────────────┘
-```
-
-## Models
-
-| Component | Model | Size | Purpose |
-|-----------|-------|------|---------|
-| Text Embedding | `sentence-transformers/all-MiniLM-L6-v2` | 22M params, 384-dim | **Single embedding model** for all content |
-| Image Captioning | `Salesforce/blip-image-captioning-base` | 247M params | Generate text descriptions of images |
-| Speech-to-Text | `openai/whisper-base` | 74M params | Transcribe audio to text |
-| Entity Extraction | `spaCy en_core_web_sm` | 12M params | NER + relationship extraction |
-
-## Qdrant Collection Schema
-
-**Single collection:** `multimodal_embeddings`
-
-**Vector:** `text_vector` — 384 dimensions, COSINE distance, HNSW indexed
-
-**Payload fields (indexed):**
-- `content_type` — `"text"` | `"image"` | `"audio"` (keyword index)
-- `source_path` — original file path (keyword index)
-- `content_hash` — SHA-256 for deduplication (keyword index)
-- `parent_doc_id` — groups chunks from same file (keyword index)
-- `file_type` — file extension (keyword index)
-- `chunk_text` — the actual text content
-- `chunk_index` — position within parent document
-- `extracted_entities` — NER entities (for entity-based filtering)
-- `tags` — user-defined tags
-- **Image-specific:** `caption`, `ocr_text`, `image_width`, `image_height`, `exif_data`
-- **Audio-specific:** `transcript`, `audio_duration`, `sample_rate`
-
-## Quick Start
-
-### 1. Prerequisites
-
-- Python 3.12+
-- Docker & Docker Compose (for Qdrant)
-- `uv` package manager (recommended) or `pip`
-- ~2GB RAM for models (loaded lazily on first use)
-
-### 2. Installation
-
-```bash
-# Clone and install with uv
-uv sync
-
-# Or with pip
-pip install -r requirements.txt
-
-# Download spaCy model
-python -m spacy download en_core_web_sm
-
-# Install Tesseract for OCR (optional)
-# Ubuntu: sudo apt-get install tesseract-ocr
-# macOS: brew install tesseract
-```
-
-### 3. Start Qdrant
-
-```bash
-docker-compose up -d
-```
-
-Verify Qdrant is running:
-```bash
-curl http://localhost:6333/collections
-```
-
-### 4. Run the Service
-
-```bash
-# Development mode with uv
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Or directly
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-API docs at: http://localhost:8000/docs
-
-## API Endpoints
-
-### Ingestion
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/ingest/text` | POST | Upload text/PDF/markdown (form or file) |
-| `/ingest/image` | POST | Upload image → BLIP caption + OCR → embed |
-| `/ingest/audio` | POST | Upload audio → Whisper transcribe → embed |
-| `/ingest/directory` | POST | Batch ingest from directory (auto-detect types) |
-
-### Search
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/search` | POST | **Unified search** — one query, all modalities |
-| `/search/{collection}` | POST | Search (backwards compat) |
-| `/search/by-type/{content_type}` | POST | Filter by `text`, `image`, or `audio` |
-| `/search/filters/by-source` | GET | Find all content from a source file |
-| `/search/filters/by-entity` | GET | Find all content mentioning an entity |
-
-### Admin
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/collections` | GET | List collections with stats |
-| `/collections/create` | POST | Initialize collections |
-
-### Agents (ADK)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/agent/chat` | POST | Chat with AI agents (orchestrator or qdrant) |
-| `/agent/agents` | GET | List available agents and capabilities |
-| `/agent/sessions` | GET | List active agent sessions |
-| `/agent/sessions/{id}` | DELETE | Delete an agent session |
-
-## Usage Examples
-
-### Ingest text
-```bash
-curl -X POST http://localhost:8000/ingest/text \
-  -F "content=Vector databases store high-dimensional embeddings for similarity search." \
-  -F "source_path=notes.txt" \
-  -F "tags=ml,databases"
-```
-
-### Ingest images from directory
-```bash
-curl -X POST http://localhost:8000/ingest/directory \
-  -H "Content-Type: application/json" \
-  -d '{"directory_path": "/path/to/images", "file_patterns": ["*.png", "*.jpg"]}'
-```
-
-### Ingest audio
-```bash
-curl -X POST http://localhost:8000/ingest/directory \
-  -H "Content-Type: application/json" \
-  -d '{"directory_path": "/path/to/audio", "file_patterns": ["*.wav", "*.mp3"]}'
-```
-
-### Unified search (returns text, images, AND audio)
-```bash
-curl -X POST http://localhost:8000/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "cat sitting", "limit": 5}'
-```
-
-### Search only images
-```bash
-curl -X POST http://localhost:8000/search/by-type/image \
-  -H "Content-Type: application/json" \
-  -d '{"query": "red car", "limit": 5}'
-```
-
-### Chat with agents (ADK)
-```bash
-# Chat with orchestrator agent
-curl -X POST http://localhost:8000/agent/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "What are the system capabilities?", "agent": "orchestrator"}'
-
-# Search using Qdrant agent
-curl -X POST http://localhost:8000/agent/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Search for vector databases", "agent": "qdrant"}'
-
-# List available agents
-curl http://localhost:8000/agent/agents
-```
-
-## AI Agents (Google ADK)
-
-The system includes AI agents built with [Google's Agent Development Kit (ADK)](https://google.github.io/adk-docs/) for natural language interaction:
-
-### 🤖 Orchestrator Agent
-Main coordinator that routes requests and manages conversations:
-- Task routing and delegation
-- System status and information
-- Multi-agent coordination
-- Conversation management
-
-### 🔍 Qdrant Agent
-Specialized agent for vector database operations:
-- Semantic search across all content types
-- Collection management
-- Database statistics
-- Filter-based retrieval
-
-### Setup
-1. Get API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Add to `.env`:
-   ```bash
-   GOOGLE_API_KEY=your_key_here
-   GOOGLE_GENAI_USE_VERTEXAI=False
-   ```
-3. Test agents:
-   ```bash
-   # Interactive CLI
-   python -m app.test_agents
-   
-   # Or use API endpoints (see above)
-   ```
-
-See [`app/agents/README.md`](app/agents/README.md) for detailed agent documentation.
-
-## Configuration
-
-All settings via environment variables or `.env` file:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `QDRANT_HOST` | `localhost` | Qdrant host |
-| `QDRANT_PORT` | `6333` | Qdrant port |
-| `TEXT_EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Text embedding model |
-| `IMAGE_CAPTIONING_MODEL` | `Salesforce/blip-image-captioning-base` | BLIP model |
-| `SPEECH_MODEL` | `openai/whisper-base` | Whisper model |
-| `TEXT_CHUNK_SIZE` | `512` | Chunk size in tokens |
-| `TEXT_CHUNK_OVERLAP` | `50` | Chunk overlap |
-| `TEXT_EMBEDDING_DIM` | `384` | Embedding dimension |
-| `HNSW_M` | `16` | HNSW M parameter |
-| `HNSW_EF_CONSTRUCT` | `200` | HNSW ef_construct |
-| `GOOGLE_API_KEY` | - | **Required for ADK agents** - Get from [AI Studio](https://aistudio.google.com/app/apikey) |
-| `GOOGLE_GENAI_USE_VERTEXAI` | `False` | Use API key auth (not Vertex AI) |
-
-## Project Structure
-
-```
-app/
-├── main.py                          # FastAPI app + startup
-├── config.py                        # Pydantic settings
-├── agents/                          # ★ ADK Agents
-│   ├── orchestrator.py              # Main coordinator agent
-│   ├── qdrant_agent.py              # Vector DB specialist agent
-│   └── README.md                    # Agent documentation
-├── models/
-│   └── models.py                    # Data models (TextChunk, ImageData, etc.)
-├── routes/
-│   ├── health.py                    # Health + admin routes
-│   ├── ingest_routes.py             # Ingestion endpoints
-│   ├── search_routes.py             # Unified search endpoints
-│   └── agent_routes.py              # ★ Agent interaction endpoints
-└── services/
-    ├── embeddings/
-    │   ├── base.py                  # Base embedding strategy
-    │   ├── text_strategy.py         # MiniLM text embeddings
-    │   ├── audio_strategy.py        # Whisper transcription + embedding
-    │   ├── image_strategy.py        # (legacy, unused)
-    │   └── caption_strategy.py      # (legacy, unused)
-    ├── processing/
-    │   ├── text_extractor.py        # ★ Unified text extraction layer
-    │   ├── text_processor.py        # Text chunking
-    │   ├── image_processor.py       # Image metadata + BLIP + OCR
-    │   ├── audio_processor.py       # Audio processing + Whisper
-    │   ├── entity_extractor.py      # spaCy NER + relationship extraction
-    │   └── pdf_processor.py         # PDF text extraction
-    └── storage/
-        ├── qdrant_manager.py        # ★ All Qdrant operations (single vector)
-        └── content_hasher.py        # SHA-256 content hashing
-```
-
-## License
-
-MIT License
+<p align="center">
+  <img src="https://img.shields.io/badge/spaCy-NER-09A3D5?style=flat-square&logo=spacy&logoColor=white" alt="spaCy"/>
+  <img src="https://img.shields.io/badge/Whisper-Speech--to--Text-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Whisper"/>
+  <img src="https://img.shields.io/badge/BLIP-Image%20Captioning-FF6F00?style=flat-square&logo=salesforce&logoColor=white" alt="BLIP"/>
+</p>
 
 ---
 
-**Built with ❤️ for AI Minds Hackathon**
+## 🎯 What is Klippy?
+
+**Klippy** is a **local-first AI assistant** that remembers everything. It combines:
+
+- 🔍 **Multimodal RAG** ; Search across text, images, and audio with one query
+- 🧠 **Knowledge Graph Reasoning** ; Neo4j-powered ontological reasoning for complex queries
+- ⚡ **Prompt Chaining** ; Google ADK agents orchestrate multi-step reasoning pipelines
+- 💾 **Personal Memory** ; Your data stays local, your assistant gets smarter
+
+> **Architecture Philosophy:** _"Graph-as-Brain, LLM-as-Mouth"_ ; All reasoning is pre-computed via deterministic graph logic. The LLM only narrates the answer. This allows sub-4B models like Qwen2.5:3b to perform like much larger models.
+
+---
+
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🎨 Multimodal Ingestion
+
+- 📝 **Text** ; TXT, MD, PDF, code files
+- 🖼️ **Images** ; BLIP captioning + Tesseract OCR
+- 🎵 **Audio** ; Whisper transcription
+- 🔄 **Differential Updates** ; Skip unchanged files via content hashing
+
+</td>
+<td width="50%">
+
+### 🔍 Unified Search
+
+- Single vector space for ALL content (384-dim)
+- One query searches text, images, and audio
+- Filter by content type, source, or entity
+- HNSW indexing for sub-millisecond search
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🧠 Knowledge Graph Reasoning
+
+- Entity extraction with spaCy NER
+- Relationship mining (Subject → Predicate → Object)
+- Multi-hop graph traversal
+- Causal chain analysis
+- Pre-computed reasoning chains for small LLMs
+
+</td>
+<td width="50%">
+
+### 🤖 Agent Architecture (Google ADK)
+
+- **Orchestrator Agent** ; Routes and coordinates
+- **Qdrant Agent** ; Semantic search specialist
+- **Neo4j Agent** ; Knowledge graph queries
+- **Prompt Chain Agent** ; Multi-step reasoning pipeline
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🖥️ Desktop App (Electron)
+
+- Native Windows/macOS/Linux app
+- Real-time chat interface
+- Source file previews with images
+- Confidence scores and entity badges
+
+</td>
+<td width="50%">
+
+### ⚙️ Context-Aware Responses
+
+- Ontological enrichment before RAG
+- Smart context truncation for small LLMs
+- Confidence scoring per reasoning step
+- Source attribution with file paths
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         🖥️ Electron Desktop App                         │
+│                     React + TypeScript + Vite                           │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ IPC / HTTP
+┌────────────────────────────────▼────────────────────────────────────────┐
+│                         🚀 FastAPI Backend                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │
+│  │   Ingest     │  │   Search     │  │   Agent      │  │  Reasoning  │ │
+│  │   Routes     │  │   Routes     │  │   Routes     │  │   Routes    │ │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬──────┘ │
+└─────────┼─────────────────┼─────────────────┼─────────────────┼────────┘
+          │                 │                 │                 │
+          ▼                 ▼                 ▼                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      🤖 Google ADK Agent Layer                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────────┐ │
+│  │ Orchestrator│◄─┤ Qdrant Agent│  │ Neo4j Agent │  │ Prompt Chain   │ │
+│  │   (root)    │  │  (search)   │  │  (graph)    │  │    Agent       │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+          │                 │                 │                 │
+          ▼                 ▼                 ▼                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        📊 Processing Services                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────────┐ │
+│  │    Text     │  │   Image     │  │   Audio     │  │    Entity      │ │
+│  │  Processor  │  │  Processor  │  │  Processor  │  │   Extractor    │ │
+│  │  (chunking) │  │(BLIP + OCR) │  │  (Whisper)  │  │    (spaCy)     │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └───────┬────────┘ │
+└─────────┼────────────────┼────────────────┼─────────────────┼──────────┘
+          │                │                │                 │
+          ▼                ▼                ▼                 │
+┌─────────────────────────────────────────────────────┐       │
+│          📝 Unified Text Layer                      │       │
+│   All modalities → Text → MiniLM-L6-v2 → 384-dim   │       │
+└──────────────────────────┬──────────────────────────┘       │
+                           │                                   │
+          ┌────────────────┴────────────────┐                 │
+          ▼                                 ▼                 ▼
+┌──────────────────┐              ┌─────────────────────────────┐
+│  📦 Qdrant       │              │  🔗 Neo4j                    │
+│  Vector DB       │              │  Knowledge Graph             │
+│  ────────────    │              │  ─────────────               │
+│  • text_vector   │              │  • Person, Topic, Event      │
+│  • 384-dim HNSW  │              │  • MENTIONS, ABOUT, KNOWS    │
+│  • Unified space │              │  • Cypher templates          │
+└──────────────────┘              └───────────────────────────────┘
+          │                                 │
+          └────────────────┬────────────────┘
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         🦙 Ollama (Local LLM)                           │
+│                        Qwen2.5:3b / Llama3.2                            │
+│              "Narrates" pre-computed reasoning chains                   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🛠️ Tech Stack
+
+| Category       | Technologies                                                                                                                                                                                                                                                                                                                                                                                                             | Purpose                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| **Backend**    | ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) ![Python](https://img.shields.io/badge/Python%203.12-3776AB?style=flat-square&logo=python&logoColor=white) ![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=flat-square&logo=pydantic&logoColor=white)                                                                                              | REST API, validation, async I/O |
+| **Frontend**   | ![Electron](https://img.shields.io/badge/Electron-47848F?style=flat-square&logo=electron&logoColor=white) ![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white) | Desktop app, chat UI            |
+| **Vector DB**  | ![Qdrant](https://img.shields.io/badge/Qdrant-FF6B6B?style=flat-square)                                                                                                                                                                                                                                                                                                                                                  | Semantic search, HNSW indexing  |
+| **Graph DB**   | ![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=flat-square&logo=neo4j&logoColor=white)                                                                                                                                                                                                                                                                                                                         | Knowledge graph, Cypher queries |
+| **LLM**        | ![Ollama](https://img.shields.io/badge/Ollama-000000?style=flat-square) ![Qwen](https://img.shields.io/badge/Qwen2.5:3b-purple?style=flat-square)                                                                                                                                                                                                                                                                        | Local inference                 |
+| **Agents**     | ![Google ADK](https://img.shields.io/badge/Google%20ADK-4285F4?style=flat-square&logo=google&logoColor=white) ![LiteLLM](https://img.shields.io/badge/LiteLLM-orange?style=flat-square)                                                                                                                                                                                                                                  | Agent orchestration             |
+| **Embeddings** | ![MiniLM](https://img.shields.io/badge/MiniLM--L6--v2-FFD21E?style=flat-square&logo=huggingface&logoColor=black)                                                                                                                                                                                                                                                                                                         | Text embeddings (384-dim)       |
+| **Vision**     | ![BLIP](https://img.shields.io/badge/BLIP-FF6F00?style=flat-square&logo=salesforce&logoColor=white) ![Tesseract](https://img.shields.io/badge/Tesseract-OCR-blue?style=flat-square)                                                                                                                                                                                                                                      | Image captioning, OCR           |
+| **Speech**     | ![Whisper](https://img.shields.io/badge/Whisper-74aa9c?style=flat-square&logo=openai&logoColor=white)                                                                                                                                                                                                                                                                                                                    | Speech-to-text                  |
+| **NLP**        | ![spaCy](https://img.shields.io/badge/spaCy-09A3D5?style=flat-square&logo=spacy&logoColor=white)                                                                                                                                                                                                                                                                                                                         | NER, relationship extraction    |
+| **DevOps**     | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![uv](https://img.shields.io/badge/uv-purple?style=flat-square)                                                                                                                                                                                                                                                      | Containers, fast packaging      |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Python 3.12+**
+- **Docker Desktop** (for Qdrant & Neo4j)
+- **Ollama** (for local LLM)
+- **Node.js 18+** (for frontend)
+- **uv** package manager (recommended)
+
+### 1️⃣ Clone & Install
+
+```bash
+git clone https://github.com/Rayen-Hamza/AI-Minds-Hackathon.git
+cd AI-Minds-Hackathon
+
+# Install Python dependencies
+uv sync
+
+# Download spaCy model
+uv run python -m spacy download en_core_web_sm
+```
+
+### 2️⃣ Start Databases
+
+```bash
+docker compose up -d
+```
+
+This starts:
+
+- **Qdrant** on `localhost:6333` (Vector DB)
+- **Neo4j** on `localhost:7474` (Graph DB, password: `changeme`)
+
+### 3️⃣ Start Ollama
+
+```bash
+# In a separate terminal (or it may already be running)
+ollama serve
+
+# Pull the model (first time only)
+ollama pull qwen2.5:3b
+```
+
+### 4️⃣ Start the API
+
+```bash
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+📚 API docs: http://localhost:8000/docs
+
+### 5️⃣ Start the Desktop App (Optional)
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+---
+
+## 📡 API Reference
+
+### Ingestion
+
+| Endpoint            | Method | Description                  |
+| ------------------- | ------ | ---------------------------- |
+| `/ingest/text`      | POST   | Upload text/PDF/markdown     |
+| `/ingest/image`     | POST   | Upload image → caption + OCR |
+| `/ingest/audio`     | POST   | Upload audio → transcribe    |
+| `/ingest/directory` | POST   | Batch ingest from path       |
+
+### Search
+
+| Endpoint                    | Method | Description                         |
+| --------------------------- | ------ | ----------------------------------- |
+| `/search`                   | POST   | **Unified search** ; all modalities |
+| `/search/by-type/{type}`    | POST   | Filter by `text`/`image`/`audio`    |
+| `/search/filters/by-entity` | GET    | Find content by entity              |
+
+### Agents (Google ADK)
+
+| Endpoint          | Method | Description                  |
+| ----------------- | ------ | ---------------------------- |
+| `/agent/chat`     | POST   | Chat with orchestrator agent |
+| `/agent/sessions` | GET    | List active sessions         |
+| `/agent/agents`   | GET    | List available agents        |
+
+### Reasoning
+
+| Endpoint            | Method | Description                  |
+| ------------------- | ------ | ---------------------------- |
+| `/reasoning/query`  | POST   | Graph reasoning → LLM prompt |
+| `/reasoning/ingest` | POST   | Ingest document to graph     |
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=app
+
+# Run specific test
+uv run pytest tests/test_embeddings.py -v
+```
+
+---
+
+## 📁 Project Structure
+
+```
+AI-Minds-Hackathon/
+├── app/                          # FastAPI backend
+│   ├── agents/                   # Google ADK agents
+│   │   ├── orchestrator.py       # Root agent (router)
+│   │   ├── qdrant_agent.py       # Vector search specialist
+│   │   ├── neo4j_agent.py        # Knowledge graph specialist
+│   │   └── prompt_chain.py       # Prompt chaining pipeline
+│   ├── models/                   # Pydantic models
+│   ├── routes/                   # API endpoints
+│   ├── services/                 # Business logic
+│   │   ├── embeddings/           # Embedding strategies
+│   │   ├── processing/           # Text/Image/Audio processors
+│   │   └── storage/              # Qdrant manager
+│   └── config.py                 # Settings
+├── frontend/                     # Electron desktop app
+│   └── src/
+│       ├── main/                 # Electron main process
+│       └── renderer/             # React UI
+├── tests/                        # pytest tests
+├── docker-compose.yml            # Qdrant + Neo4j
+└── pyproject.toml                # Python dependencies
+```
+
+---
+
+## 🔧 Configuration
+
+Create a `.env` file:
+
+```env
+# Qdrant
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+
+# Neo4j
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=changeme
+
+# Ollama (Local LLM)
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen2.5:3b
+LLM_BASE_URL=http://localhost:11434/v1
+
+# Processing
+TEXT_CHUNK_SIZE=512
+TEXT_CHUNK_OVERLAP=50
+LOG_LEVEL=INFO
+```
+
+---
+
+## 🏆 Hackathon Team
+
+<table>
+<tr>
+<td align="center">
+  <strong>AI Minds 2026</strong><br/>
+  Built with ❤️ and ☕
+</td>
+</tr>
+</table>
+
+---
+
+## 📜 License
+
+MIT License ; see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Made%20for-AI%20Minds%20Hackathon%202026-blueviolet?style=for-the-badge"/>
+</p>
+
+<p align="center">
+  <sub>⭐ Star this repo if you find it useful!</sub>
+</p>
