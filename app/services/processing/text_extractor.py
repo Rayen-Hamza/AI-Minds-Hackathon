@@ -48,6 +48,7 @@ class ImageTextExtractor:
         """Check if Tesseract OCR is available."""
         try:
             import pytesseract
+
             pytesseract.get_tesseract_version()
             self._ocr_available = True
             logger.info("Tesseract OCR is available")
@@ -143,13 +144,13 @@ class ImageTextExtractor:
                 return None
 
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            _, thresh = cv2.threshold(
-                gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-            )
+            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             text = pytesseract.image_to_string(thresh).strip()
 
             if text:
-                logger.debug(f"OCR extracted {len(text)} chars from {Path(image_path).name}")
+                logger.debug(
+                    f"OCR extracted {len(text)} chars from {Path(image_path).name}"
+                )
                 return text
             return None
 
@@ -204,6 +205,7 @@ class AudioTextExtractor:
         """Lazy-load audio embedder for transcription."""
         if self._audio_embedder is None:
             from app.services.embeddings.audio_strategy import get_audio_embedder
+
             self._audio_embedder = get_audio_embedder()
         return self._audio_embedder
 
@@ -316,11 +318,40 @@ class PlainTextExtractor:
 
 # File extension → content type mapping
 _TEXT_EXTS = {
-    ".txt", ".md", ".py", ".js", ".ts", ".java", ".cpp", ".c", ".h",
-    ".hpp", ".cs", ".go", ".rs", ".rb", ".php", ".html", ".css",
-    ".json", ".xml", ".yaml", ".yml", ".toml", ".ini", ".cfg",
-    ".conf", ".sh", ".bash", ".zsh", ".sql", ".r", ".m", ".swift",
-    ".kt", ".scala",
+    ".txt",
+    ".md",
+    ".py",
+    ".js",
+    ".ts",
+    ".java",
+    ".cpp",
+    ".c",
+    ".h",
+    ".hpp",
+    ".cs",
+    ".go",
+    ".rs",
+    ".rb",
+    ".php",
+    ".html",
+    ".css",
+    ".json",
+    ".xml",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".sql",
+    ".r",
+    ".m",
+    ".swift",
+    ".kt",
+    ".scala",
 }
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff"}
 _AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac", ".wma", ".opus"}

@@ -53,9 +53,7 @@ class EntityExtractor:
         return self._nlp
 
     def extract_entities(
-        self,
-        text: str,
-        entity_types: Optional[list[str]] = None
+        self, text: str, entity_types: Optional[list[str]] = None
     ) -> list[str]:
         """
         Extract named entities from text.
@@ -97,9 +95,7 @@ class EntityExtractor:
             return []
 
     def extract_entities_with_labels(
-        self,
-        text: str,
-        entity_types: Optional[list[str]] = None
+        self, text: str, entity_types: Optional[list[str]] = None
     ) -> list[dict[str, str]]:
         """
         Extract entities with their labels.
@@ -120,12 +116,14 @@ class EntityExtractor:
             entities = []
             for ent in doc.ents:
                 if entity_types is None or ent.label_ in entity_types:
-                    entities.append({
-                        "text": ent.text,
-                        "label": ent.label_,
-                        "start": ent.start_char,
-                        "end": ent.end_char
-                    })
+                    entities.append(
+                        {
+                            "text": ent.text,
+                            "label": ent.label_,
+                            "start": ent.start_char,
+                            "end": ent.end_char,
+                        }
+                    )
 
             return entities
 
@@ -155,7 +153,7 @@ class EntityExtractor:
                 "organizations": [],
                 "locations": [],
                 "dates": [],
-                "other": []
+                "other": [],
             }
 
             for ent in doc.ents:
@@ -181,9 +179,7 @@ class EntityExtractor:
             return {}
 
     def extract_batch(
-        self,
-        texts: list[str],
-        entity_types: Optional[list[str]] = None
+        self, texts: list[str], entity_types: Optional[list[str]] = None
     ) -> list[list[str]]:
         """
         Extract entities from multiple texts efficiently.
@@ -269,11 +265,13 @@ class EntityExtractor:
                                     break
 
                     if subject and obj:
-                        relationships.append({
-                            "subject": subject,
-                            "predicate": token.lemma_,
-                            "object": obj,
-                        })
+                        relationships.append(
+                            {
+                                "subject": subject,
+                                "predicate": token.lemma_,
+                                "object": obj,
+                            }
+                        )
 
             logger.debug(
                 f"Extracted {len(relationships)} relationships from text "
@@ -299,9 +297,7 @@ class EntityExtractor:
         span = token.doc[token.left_edge.i : token.right_edge.i + 1]
         return span.text.strip()
 
-    def extract_entities_and_relationships(
-        self, text: str
-    ) -> dict:
+    def extract_entities_and_relationships(self, text: str) -> dict:
         """
         Extract both entities and relationships in a single pass.
         Returns structured data ready for graph construction.

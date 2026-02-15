@@ -246,7 +246,11 @@ class QdrantManager:
             if image_data.ocr_text:
                 text_parts.append(f"Text in image: {image_data.ocr_text}")
 
-            chunk_text = ". ".join(text_parts) if text_parts else f"Image: {Path(image_data.image_path).name}"
+            chunk_text = (
+                ". ".join(text_parts)
+                if text_parts
+                else f"Image: {Path(image_data.image_path).name}"
+            )
 
             # Embed text representation with the same text model
             text_embedding = self.text_embedder.embed(chunk_text)
