@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # OpenAI Whisper Base for speech-to-text (~74M params, CPU-friendly)
     speech_model: str = "openai/whisper-base"
 
+    # spaCy NER model (download with: python -m spacy download en_core_web_sm)
+    spacy_model: str = "en_core_web_sm"
+
     # Processing Configuration
     text_chunk_size: int = 512
     text_chunk_overlap: int = 50
