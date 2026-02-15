@@ -10,6 +10,8 @@ from typing import Optional, Protocol
 
 from PIL import Image
 
+from .content_sanitizer import sanitize_ingested_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -148,6 +150,9 @@ class ImageTextExtractor:
             text = pytesseract.image_to_string(thresh).strip()
 
             if text:
+                # Sanitize OCR output — adversarial images can contain
+                # text designed to inject into downstream LLM prompts.
+                text = sanitize_ingested_text(text, source="ocr")
                 logger.debug(
                     f"OCR extracted {len(text)} chars from {Path(image_path).name}"
                 )
@@ -228,6 +233,10 @@ class AudioTextExtractor:
                 logger.warning(f"Empty transcript for {source_path}")
                 return f"Audio: {Path(source_path).name}"
 
+            # Sanitize transcript — audio may contain spoken injection
+            # payloads that Whisper faithfully transcribes.
+            transcript = sanitize_ingested_text(transcript, source="audio_transcript")
+
             logger.info(
                 f"Transcribed {Path(source_path).name}: {len(transcript)} chars"
             )
@@ -273,6 +282,10 @@ class PDFTextExtractor:
             if not full_text.strip():
                 return f"PDF: {Path(source_path).name}"
 
+            # Sanitize — PDFs can contain invisible text layers
+            # (white-on-white, zero-size fonts) with injection payloads.
+            full_text = sanitize_ingested_text(full_text, source="pdf")
+
             logger.info(
                 f"Extracted {len(full_text)} chars from PDF {Path(source_path).name}"
             )
@@ -305,7 +318,8 @@ class PlainTextExtractor:
             text = Path(source_path).read_text(encoding="utf-8", errors="replace")
             if not text.strip():
                 return f"File: {Path(source_path).name}"
-            return text
+            # Sanitize plain text — files may contain embedded injection payloads.
+            return sanitize_ingested_text(text, source="text_file")
 
         except Exception as e:
             logger.error(f"Text file read failed for {source_path}: {e}")
