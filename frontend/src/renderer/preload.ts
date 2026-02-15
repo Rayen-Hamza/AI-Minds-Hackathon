@@ -103,6 +103,10 @@ const klippyApi: KlippyApi = {
   // Agent
   agentChat: (message: string, sessionId: string) =>
     ipcRenderer.invoke(IpcMessages.AGENT_CHAT, message, sessionId),
+
+  // File System
+  openFileInFolder: (filePath: string) =>
+    ipcRenderer.invoke(IpcMessages.OPEN_FILE_IN_FOLDER, filePath),
 };
 
 contextBridge.exposeInMainWorld("klippy", klippyApi);

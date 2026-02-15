@@ -108,6 +108,7 @@ async def chat_with_agent(request: AgentRequest):
         else:
             agent = root_agent
             runner = orchestrator_runner
+        logger.info(f"Selected agent: {agent.name}, runner: {runner}")
 
         # Get or create session
         session_id = request.session_id or str(uuid4())
@@ -124,13 +125,15 @@ async def chat_with_agent(request: AgentRequest):
             query=request.message,
             max_events=5,
             session_id=session_id,
-            use_semantic_search=True
+            use_semantic_search=True,
         )
 
         # If we have memory context, prepend it to the message
         enriched_message = request.message
         if memory_context:
-            logger.info(f"Enriching message with memory context (session: {session_id})")
+            logger.info(
+                f"Enriching message with memory context (session: {session_id})"
+            )
             # Inject memory context as a system-level instruction
             enriched_message = f"{memory_context}\n\nUser query: {request.message}"
 
@@ -145,11 +148,13 @@ async def chat_with_agent(request: AgentRequest):
         for event in runner.run(
             user_id=DEFAULT_USER_ID, session_id=session_id, new_message=user_message
         ):
+            logger.info(f"Runner event: {event}")
             # Extract text from response
             if hasattr(event, "content") and event.content:
                 if hasattr(event.content, "parts") and event.content.parts:
                     for part in event.content.parts:
                         if hasattr(part, "text") and part.text:
+                            logger.info(f"Event part text: {part.text}")
                             response_text += part.text
 
         # Update message count
@@ -166,7 +171,7 @@ async def chat_with_agent(request: AgentRequest):
                 user_message=request.message,
                 assistant_response=response_text,
                 session_id=session_id,
-                metadata={"agent": agent.name}
+                metadata={"agent": agent.name},
             )
             logger.debug(f"Recorded conversation event for session {session_id}")
         except Exception as mem_err:
@@ -335,10 +340,7 @@ async def get_memory_stats():
         service = MemoryService()
         stats = service.get_stats()
 
-        return {
-            "success": True,
-            "stats": stats
-        }
+        return {"success": True, "stats": stats}
     except Exception as e:
         logger.error(f"Error getting memory stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -363,8 +365,8 @@ async def get_user_profile():
             "profile": {
                 "properties": profile.properties,
                 "preferences": profile.preferences,
-                "updated_at": profile.updated_at.isoformat()
-            }
+                "updated_at": profile.updated_at.isoformat(),
+            },
         }
     except Exception as e:
         logger.error(f"Error getting profile: {e}")
@@ -389,11 +391,12 @@ async def clear_memory(session_id: Optional[str] = None):
         success = service.clear_all(session_id)
 
         if success:
-            message = f"Memory cleared for session {session_id}" if session_id else "All memory cleared"
-            return {
-                "success": True,
-                "message": message
-            }
+            message = (
+                f"Memory cleared for session {session_id}"
+                if session_id
+                else "All memory cleared"
+            )
+            return {"success": True, "message": message}
         else:
             raise HTTPException(status_code=500, detail="Failed to clear memory")
 

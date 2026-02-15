@@ -1,14 +1,37 @@
 {
   "properties": {
     "name": "ADEM",
-    "gender_identity": "male",
-    "sexual_orientation": "homosexual",
-    "role": "user",
-    "database_experience": "basic"
+    "interests": [
+      "pictures of cats",
+      "lemon juice",
+      "cats",
+      "photographs of cats"
+    ],
+    "query_type": "image_search",
+    "previous_interests": [
+      "images of cats"
+    ]
   },
   "preferences": {
-    "identification_conflict": true,
-    "preferred_response_style": "technical"
+    "animal_interest": [
+      "cat"
+    ],
+    "communication_style": "concise",
+    "access_style": "specific_directories",
+    "interests": [
+      "cats"
+    ],
+    "preferred_media_type": "images",
+    "search_terms": [
+      "cat"
+    ],
+    "search_interest": "information about lemon juice or AI research",
+    "search_style": "concise",
+    "dislikes": [
+      "unrelated information"
+    ],
+    "media_topic": "cats",
+    "preferred_subject_in_images": "cats"
   },
-  "updated_at": "2026-02-15T06:59:40.113905"
+  "updated_at": "2026-02-15T08:47:45.412667"
 }

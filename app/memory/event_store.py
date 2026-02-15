@@ -135,17 +135,18 @@ class EventStore:
                     ]
                 )
 
-            # Search
-            results = self.client.search(
+            # Search using query_points (qdrant-client >= 1.12)
+            response = self.client.query_points(
                 collection_name=self.COLLECTION_NAME,
-                query_vector=query_embedding,
+                query=query_embedding,
                 limit=limit,
                 query_filter=query_filter,
+                with_payload=True,
             )
 
             # Extract payloads and convert timestamps back to datetime
             events = []
-            for result in results:
+            for result in response.points:
                 payload = result.payload.copy()
                 if "timestamp" in payload:
                     payload["timestamp"] = datetime.fromisoformat(payload["timestamp"])
@@ -159,7 +160,9 @@ class EventStore:
             logger.error(f"Error searching events: {e}")
             return []
 
-    def get_recent_events(self, limit: int = 10, session_id: Optional[str] = None) -> List[dict]:
+    def get_recent_events(
+        self, limit: int = 10, session_id: Optional[str] = None
+    ) -> List[dict]:
         """
         Get the most recent events.
 

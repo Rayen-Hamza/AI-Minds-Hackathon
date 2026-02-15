@@ -3,14 +3,25 @@ Main FastAPI application — unified startup for Qdrant + Neo4j services.
 """
 
 import logging
+import warnings
 from contextlib import asynccontextmanager
+
+# Suppress Pydantic serialization warnings from LiteLLM/ADK response objects
+# (local Ollama models return fewer fields than the Pydantic models expect)
+warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routes import ingest_router, search_router, admin_router, agent_router
+from app.routes import (
+    ingest_router,
+    search_router,
+    admin_router,
+    agent_router,
+    files_router,
+)
 from app.routes import health, reasoning
 from app.services.neo4j import close_driver, init_driver
 from app.services.storage import get_qdrant_manager
@@ -80,7 +91,9 @@ async def lifespan(_app: FastAPI):
         )
 
     logger.info("=" * 80)
-    logger.info("Service ready! API docs at http://localhost:%d/docs", settings.api_port)
+    logger.info(
+        "Service ready! API docs at http://localhost:%d/docs", settings.api_port
+    )
     logger.info("=" * 80)
 
     yield
@@ -145,6 +158,7 @@ app.include_router(admin_router)
 app.include_router(ingest_router)
 app.include_router(search_router)
 app.include_router(agent_router)
+app.include_router(files_router)
 app.include_router(reasoning.router)
 
 

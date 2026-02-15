@@ -44,32 +44,25 @@ def search_vectors(
             f"Searching vectors for query: '{query}' (limit={limit}, type={content_type})"
         )
 
-        # Build filters
-        filters = {}
-        if content_type:
-            filters["content_type"] = content_type
-        if tags:
-            filters["tags"] = tags
-
-        # Perform search
-        results = qdrant_manager.search(
-            collection_name=settings.unified_collection,
+        # Perform search — content_type filtering is handled by the content_types parameter
+        results = qdrant_manager.search_unified(
             query_text=query,
+            content_types=[content_type] if content_type else None,
             limit=limit,
-            filters=filters if filters else None,
         )
 
         # Format results
         formatted_results = []
         for result in results:
+            payload = result.payload
             formatted_results.append(
                 {
-                    "content": result.content,
+                    "content": payload.chunk_text,
                     "score": result.score,
-                    "content_type": result.content_type,
-                    "source_file": result.source_file,
-                    "tags": result.tags,
-                    "metadata": result.metadata,
+                    "content_type": payload.content_type,
+                    "source_file": payload.source_path,
+                    "tags": payload.tags,
+                    "metadata": payload.dict(),
                 }
             )
 
@@ -171,9 +164,9 @@ def search_by_filters(
             return {"success": False, "error": "At least one filter must be provided"}
 
         # Use a dummy query for filter-only search
-        results = qdrant_manager.search(
-            collection_name=settings.unified_collection,
+        results = qdrant_manager.search_unified(
             query_text="",
+            content_types=[content_type] if content_type else None,
             limit=limit,
             filters=filters,
         )
@@ -181,13 +174,14 @@ def search_by_filters(
         # Format results
         formatted_results = []
         for result in results:
+            payload = result.payload
             formatted_results.append(
                 {
-                    "content": result.content,
-                    "content_type": result.content_type,
-                    "source_file": result.source_file,
-                    "tags": result.tags,
-                    "metadata": result.metadata,
+                    "content": payload.chunk_text,
+                    "content_type": payload.content_type,
+                    "source_file": payload.source_path,
+                    "tags": payload.tags,
+                    "metadata": payload.dict(),
                 }
             )
 
@@ -402,7 +396,7 @@ qdrant_agent = Agent(
     model=LiteLlm(
         model=f"openai/{qdrant_settings.llm_model}",
         api_base=qdrant_settings.llm_base_url,
-        api_key="dummy",
+        api_key=qdrant_settings.llm_api_key or "dummy",
     ),
     description="""You are a Qdrant vector database specialist. 
     You help users search for information, ingest content, manage collections, and retrieve data from the vector database.
@@ -420,27 +414,51 @@ qdrant_agent = Agent(
     When users ask about database statistics or collection info, use the appropriate tools.
     Always provide clear, helpful responses based on the results.""",
     instruction="""You are an expert in vector databases, semantic search, and content ingestion.
-    
-    When handling search requests:
-    1. Use search_vectors for semantic queries
-    2. Use search_by_filters when users specify exact filters
-    3. Interpret results and present them in a user-friendly format
-    4. Explain relevance scores when appropriate
-    5. Suggest refinements if results aren't satisfactory
-    
-    When handling ingestion requests:
-    1. Use ingest_directory to process files from a directory
-    2. Explain what file types are supported (text, images, audio)
-    3. Report statistics about what was processed
-    4. Inform users about skipped or failed files
-    5. Suggest appropriate tags when relevant
-    
-    When handling information requests:
-    - Use get_collection_info for collection details
-    - Use list_collections to show available collections
-    - Use get_vector_stats for database statistics
-    
-    Always be helpful, explain what you're doing, and provide actionable feedback.""",
+
+CRITICAL: When you receive ANY search or find request, IMMEDIATELY call search_vectors with the user's query. Do NOT ask clarifying questions about directories, filenames, file types, or formats. The semantic search engine understands meaning — just pass the query directly.
+
+Examples:
+- "find me a cat image" → call search_vectors(query="cat", content_type="image")
+- "show me photos of sunset" → call search_vectors(query="sunset", content_type="image")
+- "find documents about AI" → call search_vectors(query="AI", content_type="text")
+- "search for music" → call search_vectors(query="music", content_type="audio")
+- "find anything about dogs" → call search_vectors(query="dogs")
+
+OUTPUT FORMAT - CRITICAL:
+When search_vectors returns results for images or audio:
+
+YOU MUST format the output as markdown images using the API endpoint.
+
+CORRECT format for images:
+![Image](http://localhost:8000/files/serve?path=/mnt/data/home/adem/Desktop/AI-Minds-Hackathon/tests/images/cat_face.png)
+
+CORRECT format for audio:
+[Audio File](http://localhost:8000/files/serve?path=/path/to/audio.mp3)
+
+Steps:
+1. Extract the "source_file" from each result
+2. For images: Output as markdown image: ![Image](http://localhost:8000/files/serve?path=FULL_PATH_HERE)
+3. For audio: Output as markdown link: [Audio](http://localhost:8000/files/serve?path=FULL_PATH_HERE)
+4. Replace FULL_PATH_HERE with the actual file path
+5. NO explanations, just the markdown
+
+For text search results, you can include context and descriptions.
+
+When handling search requests:
+1. ALWAYS call search_vectors IMMEDIATELY — never ask the user for more details first
+2. Use content_type filter only when the user clearly specifies a type (image, text, audio)
+3. For images/audio: output ONLY file paths, one per line
+4. For text: present with context and descriptions
+5. If no results found, say so and suggest ingesting relevant content
+
+When handling ingestion requests:
+1. Use ingest_directory to process files from a directory
+2. Report statistics about what was processed
+
+When handling information requests:
+- Use get_collection_info for collection details
+- Use list_collections to show available collections
+- Use get_vector_stats for database statistics""",
     tools=[
         FunctionTool(func=search_vectors),
         FunctionTool(func=get_collection_info),

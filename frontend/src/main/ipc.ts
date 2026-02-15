@@ -1,4 +1,4 @@
-import { clipboard, Data, ipcMain } from "electron";
+import { clipboard, Data, ipcMain, shell } from "electron";
 import {
   toggleChatWindow,
   maximizeChatWindow,
@@ -125,5 +125,10 @@ export function setupIpcListeners() {
       console.error("Error calling agent chat:", error);
       throw error;
     }
+  });
+
+  // File System
+  ipcMain.handle(IpcMessages.OPEN_FILE_IN_FOLDER, (_, filePath: string) => {
+    shell.showItemInFolder(filePath);
   });
 }

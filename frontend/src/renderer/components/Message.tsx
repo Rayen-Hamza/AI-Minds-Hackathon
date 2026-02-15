@@ -1,8 +1,9 @@
 import Markdown from "react-markdown";
 import { useState } from "react";
 import questionIcon from "../images/icons/question.png";
-import defaultKlippy from "../images/animations/Default.png";
+import iconV2 from "../../../assets/icon_v2.png";
 import { MessageRecord } from "../../types/interfaces";
+import { klippyApi } from "../klippyApi";
 
 export interface Message extends MessageRecord {
   id: string;
@@ -235,7 +236,7 @@ export function Message({ message }: { message: Message }) {
       style={{ display: "flex", alignItems: "flex-start" }}
     >
       <img
-        src={isUser ? questionIcon : defaultKlippy}
+        src={isUser ? questionIcon : iconV2}
         alt={isUser ? "You" : "Klippy"}
         style={{
           width: "28px",
@@ -286,6 +287,145 @@ export function Message({ message }: { message: Message }) {
                   a: ({ node, ...props }) => (
                     <a target="_blank" rel="noopener noreferrer" {...props} />
                   ),
+                  img: ({ node, ...props }) => (
+                    <img
+                      {...props}
+                      style={{
+                        maxWidth: "100%",
+                        height: "auto",
+                        borderRadius: "8px",
+                        marginTop: "8px",
+                        marginBottom: "8px",
+                      }}
+                      alt={props.alt || "Image"}
+                    />
+                  ),
+                  text: ({ children }) => {
+                    const handleOpenFile = (filePath: string) => {
+                      const cleanPath = filePath.replace(/^file:\/\//, '').trim();
+                      console.log('Opening file from text:', cleanPath);
+                      klippyApi.openFileInFolder(cleanPath);
+                    };
+
+                    const content = String(children);
+                    // Match any absolute path (starting with /)
+                    const filePathRegex = /(\/[^\s]+)/g;
+                    const matches = content.match(filePathRegex);
+
+                    if (!matches || matches.length === 0) {
+                      return <>{children}</>;
+                    }
+
+                    const parts = content.split(filePathRegex);
+                    const processedContent = parts.map((part, index) => {
+                      if (part && part.startsWith('/') && part.length > 1) {
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleOpenFile(part)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "4px 12px",
+                              marginLeft: "4px",
+                              marginRight: "4px",
+                              backgroundColor: "#1a56db",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              fontSize: "0.85em",
+                              fontWeight: "500",
+                              fontFamily: "monospace",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = "#1347c4";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = "#1a56db";
+                            }}
+                            title={`Click to open: ${part}`}
+                          >
+                            📁 {part.split('/').pop()}
+                          </button>
+                        );
+                      }
+                      if (part) {
+                        return <span key={index}>{part}</span>;
+                      }
+                      return null;
+                    });
+
+                    return <>{processedContent}</>;
+                  },
+                  p: ({ node, children, ...props }) => {
+                    const handleOpenFile = (filePath: string) => {
+                      const cleanPath = filePath.replace(/^file:\/\//, '').trim();
+                      console.log('Opening file:', cleanPath);
+                      klippyApi.openFileInFolder(cleanPath);
+                    };
+
+                    // Convert children to string and detect file paths
+                    const content = String(children);
+
+                    // Regex to match file paths - match any absolute path starting with /
+                    const filePathRegex = /(\/[^\s]+)/g;
+
+                    // Find all matches
+                    const matches = content.match(filePathRegex);
+
+                    // If no file paths found, return regular paragraph
+                    if (!matches || matches.length === 0) {
+                      return <p {...props}>{children}</p>;
+                    }
+
+                    // Split and process
+                    const parts = content.split(filePathRegex);
+
+                    // Process parts and create buttons for file paths
+                    const processedContent = parts.map((part, index) => {
+                      // Check if this part is a file path (starts with /)
+                      if (part && part.startsWith('/') && part.length > 1) {
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleOpenFile(part)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "4px 12px",
+                              marginLeft: "4px",
+                              marginRight: "4px",
+                              backgroundColor: "#1a56db",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              fontSize: "0.85em",
+                              fontWeight: "500",
+                              fontFamily: "monospace",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = "#1347c4";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = "#1a56db";
+                            }}
+                            title={`Click to open: ${part}`}
+                          >
+                            📁 {part.split('/').pop()}
+                          </button>
+                        );
+                      }
+                      // Regular text
+                      if (part) {
+                        return <span key={index}>{part}</span>;
+                      }
+                      return null;
+                    });
+
+                    return <p {...props}>{processedContent}</p>;
+                  },
                 }}
               >
                 {message.content}
