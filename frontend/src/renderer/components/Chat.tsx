@@ -1,0 +1,169 @@
+import { useState } from "react";
+
+import { Message } from "./Message";
+import { ChatInput } from "./ChatInput";
+import { ANIMATION_KEYS_BRACKETS } from "../klippy-animation-helpers";
+import { useChat } from "../contexts/ChatContext";
+import { electronAi } from "../klippyApi";
+
+export type ChatProps = {
+  style?: React.CSSProperties;
+};
+
+export function Chat({ style }: ChatProps) {
+  const { setAnimationKey, setStatus, status, messages, addMessage } =
+    useChat();
+  const [streamingMessageContent, setStreamingMessageContent] =
+    useState<string>("");
+  const [lastRequestUUID, setLastRequestUUID] = useState<string>(
+    crypto.randomUUID(),
+  );
+
+  const handleAbortMessage = () => {
+    electronAi.abortRequest(lastRequestUUID);
+  };
+
+  const handleSendMessage = async (message: string) => {
+    if (status !== "idle") {
+      return;
+    }
+
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      content: message,
+      sender: "user",
+      createdAt: Date.now(),
+    };
+
+    await addMessage(userMessage);
+    setStreamingMessageContent("");
+    setStatus("thinking");
+
+    try {
+      const requestUUID = crypto.randomUUID();
+      setLastRequestUUID(requestUUID);
+
+      const response = await window.electronAi.promptStreaming(message, {
+        requestUUID,
+      });
+
+      let fullContent = "";
+      let filteredContent = "";
+      let hasSetAnimationKey = false;
+
+      for await (const chunk of response) {
+        if (fullContent === "") {
+          setStatus("responding");
+        }
+
+        if (!hasSetAnimationKey) {
+          const { text, animationKey } = filterMessageContent(
+            fullContent + chunk,
+          );
+
+          filteredContent = text;
+          fullContent = fullContent + chunk;
+
+          if (animationKey) {
+            setAnimationKey(animationKey);
+            hasSetAnimationKey = true;
+          }
+        } else {
+          filteredContent += chunk;
+        }
+
+        setStreamingMessageContent(filteredContent);
+      }
+
+      // Once streaming is complete, add the full message to the messages array
+      // and clear the streaming message
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        content: filteredContent,
+        sender: "klippy",
+        createdAt: Date.now(),
+      };
+
+      addMessage(assistantMessage);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setStreamingMessageContent("");
+      setStatus("idle");
+    }
+  };
+
+  return (
+    <div style={style} className="chat-container">
+      {messages.length === 0 && status === "idle" && (
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "40px 20px",
+          color: "#888",
+          textAlign: "center",
+        }}>
+          <p style={{ fontSize: "1.1em", marginBottom: "4px" }}>
+            Ask Klippy anything!
+          </p>
+          <p style={{ fontSize: "0.85em" }}>
+            Type a message below to get started.
+          </p>
+        </div>
+      )}
+      {messages.map((message) => (
+        <Message key={message.id} message={message} />
+      ))}
+      {status === "thinking" && (
+        <div className="status-indicator" style={{ padding: "8px 0" }}>
+          <span className="status-dot status-dot--thinking" />
+          Klippy is thinking...
+        </div>
+      )}
+      {status === "responding" && (
+        <Message
+          message={{
+            id: "streaming",
+            content: streamingMessageContent,
+            sender: "klippy",
+            createdAt: Date.now(),
+          }}
+        />
+      )}
+      <ChatInput onSend={handleSendMessage} onAbort={handleAbortMessage} />
+    </div>
+  );
+}
+
+/**
+ * Filter the message content to get the text and animation key
+ *
+ * @param content - The content of the message
+ * @returns The text and animation key
+ */
+function filterMessageContent(content: string): {
+  text: string;
+  animationKey: string;
+} {
+  let text = content;
+  let animationKey = "";
+
+  if (content === "[") {
+    text = "";
+  } else if (/^\[[A-Za-z]*$/m.test(content)) {
+    text = content.replace(/^\[[A-Za-z]*$/m, "").trim();
+  } else {
+    // Check for animation keys in brackets
+    for (const key of ANIMATION_KEYS_BRACKETS) {
+      if (content.startsWith(key)) {
+        animationKey = key.slice(1, -1);
+        text = content.slice(key.length).trim();
+        break;
+      }
+    }
+  }
+
+  return { text, animationKey };
+}
