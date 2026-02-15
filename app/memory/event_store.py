@@ -160,7 +160,9 @@ class EventStore:
             logger.error(f"Error searching events: {e}")
             return []
 
-    def get_recent_events(self, limit: int = 10, session_id: Optional[str] = None) -> List[dict]:
+    def get_recent_events(
+        self, limit: int = 10, session_id: Optional[str] = None
+    ) -> List[dict]:
         """
         Get the most recent events.
 
