@@ -35,6 +35,8 @@ dev = [
     "httpx",
     "google-adk[extensions]>=1.25.0",
     "litellm>=1.80.16",
+    "watchdog>=4.0.0",
+    "pytest>=9.0.2",
 ]
 
 [tool.uv.sources]
