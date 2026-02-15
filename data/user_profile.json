@@ -1,0 +1,14 @@
+{
+  "properties": {
+    "name": "ADEM",
+    "gender_identity": "male",
+    "sexual_orientation": "homosexual",
+    "role": "user",
+    "database_experience": "basic"
+  },
+  "preferences": {
+    "identification_conflict": true,
+    "preferred_response_style": "technical"
+  },
+  "updated_at": "2026-02-15T06:59:40.113905"
+}

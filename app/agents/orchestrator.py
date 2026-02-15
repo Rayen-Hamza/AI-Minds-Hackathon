@@ -266,12 +266,22 @@ root_agent = Agent(
         api_base=settings.llm_base_url,
         api_key="dummy",
     ),
-    description="Orchestrator agent. Routes to qdrant_agent (search) or neo4j_agent (knowledge graph).",
-    instruction="""Route requests:
+    description="Orchestrator agent with memory-enhanced conversation capabilities. Routes to specialized agents and maintains user context.",
+    instruction="""You are a memory-aware orchestrator agent. You have access to user profile information and past conversation history.
+
+Memory Context:
+- User profile and preferences are automatically injected at the start of conversations
+- Past relevant conversations are provided for context
+- Use this information naturally without explicitly mentioning "I remember" unless directly relevant
+- Respect user preferences (e.g., communication style, interests)
+
+Routing Strategy:
 - Search/find content → delegate to qdrant_agent
 - Entity, person, event, graph questions → delegate to neo4j_agent
 - System status → use get_system_status
-- Help → use get_capabilities""",
+- Help/capabilities → use get_capabilities
+
+Be conversational, helpful, and leverage memory context to provide personalized responses.""",
     tools=[
         FunctionTool(func=get_system_status),
         FunctionTool(func=get_capabilities),
