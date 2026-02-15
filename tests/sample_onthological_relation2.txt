@@ -1,0 +1,297 @@
+Research Log — Distributed Training Incident & Recovery
+Author: Lena Vasquez
+Dates: 2025-11-03 through 2025-12-19
+
+=== Entry 1 — November 3, 2025 ===
+
+Started the full pre-training run for Meridian-7B on the Condor cluster (128x
+NVIDIA H100 GPUs) at the Stockholm datacenter. Using DeepSpeed ZeRO Stage 3 with
+activation checkpointing. Dataset is RedPajama-v2 filtered through our custom
+toxicity classifier built by Tomás Herrera's safety team.
+
+Hyperparameters: lr=3e-4, warmup=2000 steps, cosine decay to 1e-5, batch size
+4096 tokens × 128 GPUs = 524,288 tokens/step. Estimated time to completion:
+14 days. Total cost estimate: $380,000 on CoreWeave infrastructure.
+
+Checkpoint frequency: every 1,000 steps to AWS S3 (us-west-2) with redundant
+copy to Backblaze B2 in Amsterdam.
+
+
+=== Entry 2 — November 7, 2025 ===
+
+Loss curve looks healthy at step 12,400. Validation perplexity on the Pile
+dropped from 18.2 to 11.7. Ran a quick eval on HellaSwag — 62.3% accuracy,
+tracking with Llama-2-7B at the same token count.
+
+Yuki Tanaka from the Evaluation team flagged that our MMLU scores are lagging
+behind expectations. She suspects the math subset is pulling us down because
+RedPajama-v2 underrepresents mathematical content. Recommended mixing in
+OpenWebMath and the AMPS dataset.
+
+Carlos Mendez approved the data mixture change. New composition:
+- 70% RedPajama-v2
+- 15% The Stack v2 (code)
+- 10% OpenWebMath + AMPS
+- 5% Wikipedia + BookCorpus
+
+Paused training at step 15,000 to re-shard the dataset. Tomás Herrera re-ran
+the toxicity filter on the new math data — 0.3% rejection rate, acceptable.
+
+
+=== Entry 3 — November 12, 2025 ===
+
+Resumed training with updated data mix. Immediate improvement: math validation
+loss dropped 23% within 2,000 steps.
+
+Incident report: At step 22,847, GPU node worker-gpu-089 threw an ECC
+(Error-Correcting Code) memory error. DeepSpeed's elastic training module
+detected the failure and redistributed the load across 127 remaining GPUs.
+However, the automatic recovery corrupted the optimizer state for 3 of the
+128 data-parallel ranks.
+
+Root cause analysis by infrastructure lead Amara Osei:
+- worker-gpu-089 had been flagged by Condor's health monitoring 48 hours prior
+  with elevated temperature readings (87°C sustained).
+- The CoreWeave team (contact: Jin Park, SRE) confirmed the node had a failing
+  cooling fan assembly.
+- Recommendation: implement pre-emptive node draining when temperature exceeds
+  82°C for more than 30 minutes.
+
+Recovery: rolled back to checkpoint at step 22,000 (847 steps lost ≈ $2,300
+in compute waste). Restarted on 127 GPUs. Filed hardware replacement ticket
+HW-2025-1847 with CoreWeave.
+
+
+=== Entry 4 — November 19, 2025 ===
+
+Crossed the 50,000-step milestone. Current metrics:
+- Validation perplexity (Pile): 8.4
+- HellaSwag: 71.2%
+- MMLU (5-shot): 44.8% (up from 38.1% pre-data-mix-change)
+- HumanEval (code): 28.7%
+
+Yuki Tanaka's team ran the full LM Evaluation Harness. Meridian-7B is now
+competitive with Mistral-7B-v0.1 on most benchmarks except TruthfulQA, where
+we score 34.2% vs their 42.1%.
+
+Discussion with Carlos Mendez and Professor Elena Rossi (University of
+Edinburgh, our academic advisor) about the TruthfulQA gap. Professor Rossi
+suggested that our safety filter might be too aggressive on controversial-but-
+factual content, causing the model to hedge excessively. She recommended a
+two-pass filtering approach: first pass for genuine toxicity, second pass
+for factual calibration.
+
+Amara Osei reported that the replacement GPU node (worker-gpu-091) is online.
+Back to 128 GPUs. Also implemented the temperature-based pre-emptive drain
+policy — committed to the Condor cluster config on GitHub (PR #4521).
+
+
+=== Entry 5 — November 28, 2025 ===
+
+Training complete at step 87,500. Final pre-training metrics:
+- Pile perplexity: 6.8
+- HellaSwag: 76.4%
+- MMLU: 51.2%
+- HumanEval: 34.1%
+- TruthfulQA: 39.8% (improved after Professor Rossi's filter adjustment)
+- WinoGrande: 73.9%
+- ARC-Challenge: 52.7%
+
+Total compute: 11.2 days (vs 14 estimated — the data mix change was net
+positive). Final cost: $312,000 (under budget by $68,000).
+
+Model artifacts uploaded to:
+- Hugging Face Hub: nexus-ai/meridian-7b-base (private repo)
+- Internal registry: models.nexus.internal/meridian/7b-v1-base
+
+Post-training plan agreed with Carlos Mendez:
+1. Supervised fine-tuning (SFT) on Nexus-Instruct-v3 dataset — Lena Vasquez
+2. Direct Preference Optimization (DPO) — Tomás Herrera
+3. Safety alignment via Constitutional AI — Professor Elena Rossi consulting
+4. Quantization to GGUF for edge deployment — Yuki Tanaka
+
+
+=== Entry 6 — December 5, 2025 ===
+
+SFT phase started. Using the Nexus-Instruct-v3 dataset (520,000 instruction-
+response pairs) curated by the Data Quality team in Toronto, led by Fatima
+Al-Rashidi.
+
+Issue: the SFT training on 32 GPUs hit an OOM (Out of Memory) error at batch
+size 8 with sequence length 4096. Switched to gradient accumulation (effective
+batch size 32, micro-batch 2) and enabled Flash Attention 2. Resolved.
+
+Parallel track: Tomás Herrera began collecting preference data for DPO.
+Partnered with Scale AI (contact: Lisa Nguyen) for human annotation. 50,000
+preference pairs contracted, delivery by December 15.
+
+Amara Osei's infrastructure team deployed a new monitoring dashboard in Grafana
+tracking GPU utilization, memory pressure, and checkpoint I/O latency across
+all Condor nodes.
+
+
+=== Entry 7 — December 12, 2025 ===
+
+SFT training complete after 3 epochs. Post-SFT evaluation:
+- MT-Bench score: 7.2 / 10 (competitive with Llama-2-7B-Chat at 6.9)
+- AlpacaEval 2.0 win rate: 14.3% (vs GPT-4 as reference)
+
+Scale AI delivered 48,200 preference pairs (96.4% of contracted volume).
+Lisa Nguyen explained the shortfall — 1,800 pairs flagged by their internal
+QA for low inter-annotator agreement and removed.
+
+Tomás Herrera started DPO training. Using the TRL library from Hugging Face.
+Initial DPO hyperparameter search: β ∈ {0.1, 0.3, 0.5}, learning rate 5e-7.
+
+Critical finding: Yuki Tanaka discovered that Meridian-7B-SFT has a bias toward
+generating lists even when a narrative answer is more appropriate. Root cause
+traced to the Nexus-Instruct-v3 dataset — 34% of responses use bullet-point
+format. Fatima Al-Rashidi's team in Toronto is rebalancing the dataset for v4.
+
+Professor Elena Rossi visited our London office for a 2-day workshop on
+Constitutional AI alignment methodology. Key takeaway: the "red-teaming then
+revise" loop should be done with at least 3 diverse evaluator personas to avoid
+alignment monoculture.
+
+
+=== Entry 8 — December 19, 2025 ===
+
+DPO training complete. Final Meridian-7B-Chat metrics:
+- MT-Bench: 7.8 / 10
+- AlpacaEval 2.0 win rate: 18.1%
+- TruthfulQA: 47.3%
+- Safety eval (Nexus Red Team suite): 94.2% refusal rate on harmful prompts
+
+Carlos Mendez approved the model for internal beta release. Deployment plan:
+- January 6, 2026: Internal API launch on Kubernetes (managed by Amara Osei)
+- January 13: Beta access for Nexus Technologies product teams
+- February 1: Public release on Hugging Face Hub
+- February 15: GGUF quantized versions (Q4_K_M, Q5_K_M, Q8_0) by Yuki Tanaka
+
+Remaining risks flagged by Tomás Herrera:
+1. The model occasionally generates plausible-sounding but fabricated citations.
+   Mitigation: RAG integration with our document store (Project Athena).
+2. Multilingual performance is weak — Meridian-7B was trained primarily on
+   English. Future work: Meridian-7B-Multilingual with CC-100 data.
+
+Filed patent application PA-2025-0892 for the two-pass toxicity filtering
+method developed with Professor Rossi.
+
+---
+End of research log.
+
+
+=== EXPECTED ONTOLOGICAL RELATIONS ===
+(Ground truth for testing entity extraction and ontology construction.)
+
+ENTITIES (58):
+  Person:       Lena Vasquez, Tomás Herrera, Yuki Tanaka, Carlos Mendez,
+                Amara Osei, Elena Rossi, Jin Park, Fatima Al-Rashidi,
+                Lisa Nguyen
+  Organization: CoreWeave, Scale AI, Hugging Face, Nexus Technologies,
+                University of Edinburgh
+  Project:      Meridian-7B, Meridian-7B-Chat, Meridian-7B-SFT,
+                Condor cluster, Project Athena, Nexus-Instruct-v3,
+                Nexus-Instruct-v4
+  Topic:        DeepSpeed ZeRO, activation checkpointing, RedPajama-v2,
+                The Stack v2, OpenWebMath, AMPS, BookCorpus, Wikipedia,
+                HellaSwag, MMLU, HumanEval, TruthfulQA, WinoGrande,
+                ARC-Challenge, MT-Bench, AlpacaEval, Constitutional AI,
+                DPO (Direct Preference Optimization), SFT (Supervised Fine-Tuning),
+                Flash Attention 2, GGUF quantization, RAG,
+                mixture-of-experts, ECC memory error,
+                Llama-2-7B, Mistral-7B, GPT-4, gradient accumulation,
+                TRL library, cosine decay, toxicity classifier
+  Location:     Stockholm, Amsterdam, Toronto, London
+  Event:        GPU failure incident (step 22,847), SFT completion,
+                DPO completion, internal beta launch, public release
+
+RELATIONSHIPS (sample):
+  (Lena Vasquez)     -[:WORKED_ON]->       (Meridian-7B)
+  (Lena Vasquez)     -[:EXPERT_IN]->       (SFT)
+  (Tomás Herrera)    -[:WORKED_ON]->       (DPO)
+  (Tomás Herrera)    -[:WORKED_ON]->       (toxicity classifier)
+  (Yuki Tanaka)      -[:AFFILIATED_WITH]-> (Nexus Technologies)
+  (Yuki Tanaka)      -[:EXPERT_IN]->       (GGUF quantization)
+  (Carlos Mendez)    -[:AFFILIATED_WITH]-> (Nexus Technologies)
+  (Amara Osei)       -[:WORKED_ON]->       (Condor cluster)
+  (Elena Rossi)      -[:AFFILIATED_WITH]-> (University of Edinburgh)
+  (Elena Rossi)      -[:EXPERT_IN]->       (Constitutional AI)
+  (Fatima Al-Rashidi)-[:WORKED_ON]->       (Nexus-Instruct-v3)
+  (Lisa Nguyen)      -[:AFFILIATED_WITH]-> (Scale AI)
+  (Jin Park)         -[:AFFILIATED_WITH]-> (CoreWeave)
+  (Meridian-7B)      -[:ABOUT]->           (DeepSpeed ZeRO)
+  (Meridian-7B)      -[:ABOUT]->           (RedPajama-v2)
+  (Meridian-7B-SFT)  -[:SUBTOPIC_OF]->     (Meridian-7B)
+  (Meridian-7B-Chat) -[:SUBTOPIC_OF]->     (Meridian-7B-SFT)
+  (DPO)              -[:RELATED_TO]->      (Constitutional AI)
+  (SFT)              -[:RELATED_TO]->      (DPO)
+  (Condor cluster)   -[:LOCATED_IN]->      (Stockholm)
+  (Nexus-Instruct-v3)-[:RELATED_TO]->      (Nexus-Instruct-v4)
+  (Project Athena)   -[:RELATED_TO]->      (RAG)
+  (GGUF quantization)-[:RELATED_TO]->      (Llama-2-7B)
+
+CAUSAL CHAINS:
+  GPU failure incident:
+    (elevated temperature on worker-gpu-089)
+      -[:CAUSED]-> (ECC memory error at step 22,847)
+      -[:CAUSED]-> (optimizer state corruption)
+      -[:CAUSED]-> (rollback to step 22,000)
+      -[:CAUSED]-> ($2,300 compute waste)
+      -[:CAUSED]-> (pre-emptive drain policy implemented)
+
+  TruthfulQA improvement:
+    (aggressive safety filter)
+      -[:CAUSED]-> (low TruthfulQA score 34.2%)
+      -[:CAUSED]-> (Professor Rossi consultation)
+      -[:CAUSED]-> (two-pass filtering approach)
+      -[:CAUSED]-> (TruthfulQA improved to 39.8%)
+      -[:CAUSED]-> (patent application PA-2025-0892)
+
+  List bias discovery:
+    (Nexus-Instruct-v3 imbalance — 34% bullet-point)
+      -[:CAUSED]-> (model bias toward lists)
+      -[:CAUSED]-> (Fatima Al-Rashidi dataset rebalance)
+      -[:CAUSED]-> (Nexus-Instruct-v4 creation)
+
+TEMPORAL ANCHORS:
+  Pre-training start       → 2025-11-03
+  Data mix change          → 2025-11-07
+  GPU failure              → 2025-11-12
+  50k step milestone       → 2025-11-19
+  Pre-training complete    → 2025-11-28
+  SFT start                → 2025-12-05
+  SFT complete             → 2025-12-12
+  DPO complete             → 2025-12-19
+  Internal API launch      → 2026-01-06
+  Public release           → 2026-02-01
+  GGUF release             → 2026-02-15
+
+MULTI-HOP QUERIES THIS DOCUMENT SHOULD ANSWER:
+  Q: "How does Fatima Al-Rashidi connect to Constitutional AI?"
+  A: Fatima Al-Rashidi -[WORKED_ON]-> Nexus-Instruct-v3 -[RELATED_TO]->
+     Nexus-Instruct-v4, and separately Nexus-Instruct-v3 trains
+     Meridian-7B-SFT which feeds into DPO -[RELATED_TO]-> Constitutional AI
+     (4-5 hops through the training pipeline)
+
+  Q: "What caused the compute cost overrun?"
+  A: worker-gpu-089 temperature → ECC error → optimizer corruption →
+     checkpoint rollback → $2,300 wasted (causal chain, 4 hops)
+
+  Q: "What is the relationship between Scale AI and Meridian-7B-Chat?"
+  A: Scale AI (Lisa Nguyen) provided preference pairs → used for DPO →
+     produced Meridian-7B-Chat (3 hops)
+
+  Q: "How are Professor Rossi and patent PA-2025-0892 connected?"
+  A: Elena Rossi suggested two-pass filtering → method developed →
+     patent filed (2 hops, causal)
+
+  Q: "Compare the evaluation scores before and after the data mix change."
+  A: Requires temporal comparison across Entry 2 (pre) and Entry 4 (post)
+     for HellaSwag (62.3% → 71.2%), MMLU (38.1% → 44.8%) — comparison
+     reasoning type with temporal dimension
+
+  Q: "Who is connected to Toronto?"
+  A: Fatima Al-Rashidi (Data Quality team in Toronto),
+     Nexus Technologies (Toronto office mentioned for hiring) — multi-path
+

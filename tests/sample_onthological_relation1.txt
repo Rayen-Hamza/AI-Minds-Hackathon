@@ -1,0 +1,147 @@
+Meeting Notes — Q1 2026 AI Platform Strategy
+Date: 2026-01-14
+Author: Sarah Chen
+
+Attendees: Sarah Chen, Marcus Rivera, Priya Kapoor, David Okonkwo, Emily Zhang
+
+---
+
+## 1. Project Atlas Update
+
+Marcus Rivera presented the latest progress on Project Atlas. The team has migrated
+the core inference engine from TensorFlow to PyTorch, reducing average latency from
+120ms to 68ms. Priya Kapoor confirmed that the new ONNX export pipeline is working
+in staging at the Berlin datacenter.
+
+Key decisions:
+- Atlas v2.3 release is scheduled for February 28, 2026.
+- David Okonkwo will lead the integration with the Hermes API gateway.
+- The deployment target is Amazon Web Services us-east-1, with failover to Google
+  Cloud Platform europe-west4.
+
+---
+
+## 2. Research Collaboration with MIT CSAIL
+
+Emily Zhang reported on the partnership with MIT's Computer Science and Artificial
+Intelligence Laboratory (CSAIL). Professor James Thornton's group has shared a
+pre-print on sparse mixture-of-experts architectures that could reduce our model
+size by 40% without accuracy loss.
+
+Action items:
+- Sarah Chen to schedule a follow-up call with Professor Thornton by January 25.
+- Marcus Rivera to benchmark the MoE approach against our current dense transformer
+  on the internal SQuAD-Finance dataset.
+- Budget allocation of $150,000 for GPU compute on Lambda Cloud approved by CFO
+  Robert Kim.
+
+---
+
+## 3. Competitive Analysis
+
+Priya Kapoor shared intelligence on competitor activity:
+- Anthropic released Claude 4 with improved reasoning capabilities last week.
+- OpenAI is rumored to be launching a lightweight model for edge devices, similar
+  to what Microsoft demonstrated at CES 2026 in Las Vegas.
+- Google DeepMind published a paper on constitutional AI alignment that contradicts
+  some of our safety assumptions.
+
+David Okonkwo raised concerns about our position in the European market. The EU AI
+Act enforcement begins March 1, 2026, and our compliance team in Dublin has flagged
+three risk areas in the Atlas pipeline.
+
+---
+
+## 4. Hiring and Team Structure
+
+Emily Zhang proposed restructuring the ML Engineering team:
+- Create a new "Foundation Models" sub-team led by Marcus Rivera (4 headcount).
+- Move the MLOps function under David Okonkwo's Infrastructure org.
+- Hire a dedicated AI Safety researcher — posting on LinkedIn and reaching out to
+  candidates from the Partnership on AI network.
+
+Robert Kim approved a total hiring budget of $2.4M for Q1-Q2 across all AI teams,
+with priority given to the Paris and Toronto offices.
+
+---
+
+## 5. Upcoming Events
+
+- February 10-12: Team offsite in Barcelona, Spain for roadmap planning.
+- March 15-18: Priya Kapoor and Emily Zhang attending NeurIPS Workshop in Vienna.
+- April 5: Internal demo day — Atlas v2.3 showcase to the board of directors.
+- May 20-22: Sarah Chen keynote at the World AI Summit in Amsterdam.
+
+---
+
+## Next Steps
+
+1. Marcus Rivera: Complete PyTorch benchmark by January 21.
+2. Priya Kapoor: Deliver EU AI Act compliance gap analysis by February 5.
+3. David Okonkwo: Finalize Hermes API gateway architecture doc by January 28.
+4. Emily Zhang: Post Foundation Models team roles on internal job board by January 17.
+5. Sarah Chen: Share meeting summary with the executive team at Nexus Technologies.
+
+---
+End of notes.
+
+
+=== EXPECTED ONTOLOGICAL RELATIONS ===
+(These are the entities and relationships the system should extract and build
+into the Neo4j knowledge graph. Used as ground truth for testing.)
+
+ENTITIES (39):
+  Person:       Sarah Chen, Marcus Rivera, Priya Kapoor, David Okonkwo,
+                Emily Zhang, James Thornton, Robert Kim
+  Organization: MIT CSAIL, Anthropic, OpenAI, Microsoft, Google DeepMind,
+                Amazon Web Services, Google Cloud Platform, Lambda Cloud,
+                LinkedIn, Partnership on AI, Nexus Technologies
+  Project:      Project Atlas, Hermes API, Atlas v2.3
+  Topic:        TensorFlow, PyTorch, ONNX, mixture-of-experts, dense transformer,
+                SQuAD-Finance, constitutional AI alignment, AI Safety, MLOps,
+                Foundation Models, EU AI Act
+  Location:     Berlin, Las Vegas, Dublin, Paris, Toronto, Barcelona,
+                Vienna, Amsterdam
+  Event:        CES 2026, NeurIPS Workshop, World AI Summit, Atlas v2.3 demo day
+
+RELATIONSHIPS (sample):
+  (Marcus Rivera)   -[:WORKED_ON]->       (Project Atlas)
+  (Marcus Rivera)   -[:EXPERT_IN]->       (PyTorch)
+  (Priya Kapoor)    -[:WORKED_ON]->       (ONNX)
+  (David Okonkwo)   -[:WORKED_ON]->       (Hermes API)
+  (Emily Zhang)     -[:AFFILIATED_WITH]-> (MIT CSAIL)
+  (James Thornton)  -[:AFFILIATED_WITH]-> (MIT CSAIL)
+  (Robert Kim)      -[:AFFILIATED_WITH]-> (Nexus Technologies)
+  (Project Atlas)   -[:ABOUT]->           (PyTorch)
+  (Project Atlas)   -[:ABOUT]->           (TensorFlow)
+  (Atlas v2.3)      -[:SUBTOPIC_OF]->     (Project Atlas)
+  (EU AI Act)       -[:RELATED_TO]->      (AI Safety)
+  (MLOps)           -[:RELATED_TO]->      (Foundation Models)
+  (Google DeepMind) -[:ABOUT]->           (constitutional AI alignment)
+  (Sarah Chen)      -[:ATTENDED]->        (World AI Summit)
+  (Priya Kapoor)    -[:ATTENDED]->        (NeurIPS Workshop)
+  (Emily Zhang)     -[:ATTENDED]->        (NeurIPS Workshop)
+  (Nexus Technologies) -[:LOCATED_IN]->   (multiple — Paris, Toronto)
+
+TEMPORAL ANCHORS:
+  Atlas v2.3 release    → 2026-02-28
+  EU AI Act enforcement → 2026-03-01
+  CES 2026              → 2026-01 (approx)
+  NeurIPS Workshop      → 2026-03-15 to 2026-03-18
+  World AI Summit       → 2026-05-20 to 2026-05-22
+  Barcelona offsite     → 2026-02-10 to 2026-02-12
+  Demo day              → 2026-04-05
+
+MULTI-HOP QUERIES THIS DOCUMENT SHOULD ANSWER:
+  Q: "How does Marcus Rivera connect to MIT CSAIL?"
+  A: Marcus Rivera -[WORKED_ON]-> Project Atlas -[ABOUT]-> mixture-of-experts
+     <-[EXPERT_IN]- James Thornton -[AFFILIATED_WITH]-> MIT CSAIL  (4 hops)
+
+  Q: "What is the relationship between EU AI Act and Project Atlas?"
+  A: EU AI Act -[RELATED_TO]-> AI Safety, and Dublin compliance team flagged
+     three risk areas in Atlas pipeline  (2 hops + textual evidence)
+
+  Q: "Who is connected to Google?"
+  A: Google Cloud Platform (deployment target, David Okonkwo),
+     Google DeepMind (competitor, Priya Kapoor analysis)  (multi-path)
+
