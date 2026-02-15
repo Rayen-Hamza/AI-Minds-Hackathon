@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
-import { ANIMATION_KEYS_BRACKETS } from "../klippy-animation-helpers";
 import { useChat } from "../contexts/ChatContext";
 import { electronAi } from "../klippyApi";
 
@@ -11,8 +10,7 @@ export type ChatProps = {
 };
 
 export function Chat({ style }: ChatProps) {
-  const { setAnimationKey, setStatus, status, messages, addMessage } =
-    useChat();
+  const { setStatus, status, messages, addMessage, currentChatRecord } = useChat();
   const [streamingMessageContent, setStreamingMessageContent] =
     useState<string>("");
   const [lastRequestUUID, setLastRequestUUID] = useState<string>(
@@ -43,50 +41,41 @@ export function Chat({ style }: ChatProps) {
       const requestUUID = crypto.randomUUID();
       setLastRequestUUID(requestUUID);
 
-      const response = await window.electronAi.promptStreaming(message, {
-        requestUUID,
-      });
+      // Call the agent chat endpoint with session_id
+      setStatus("responding");
+      const response = await window.klippy.agentChat(message, currentChatRecord.id);
 
-      let fullContent = "";
-      let filteredContent = "";
-      let hasSetAnimationKey = false;
-
-      for await (const chunk of response) {
-        if (fullContent === "") {
-          setStatus("responding");
-        }
-
-        if (!hasSetAnimationKey) {
-          const { text, animationKey } = filterMessageContent(
-            fullContent + chunk,
-          );
-
-          filteredContent = text;
-          fullContent = fullContent + chunk;
-
-          if (animationKey) {
-            setAnimationKey(animationKey);
-            hasSetAnimationKey = true;
-          }
-        } else {
-          filteredContent += chunk;
-        }
-
-        setStreamingMessageContent(filteredContent);
+      // Extract the response text
+      let responseText = "";
+      if (response && response.response) {
+        responseText = response.response;
+      } else if (typeof response === "string") {
+        responseText = response;
+      } else {
+        responseText = JSON.stringify(response, null, 2);
       }
 
-      // Once streaming is complete, add the full message to the messages array
-      // and clear the streaming message
+      // Add the assistant's response to the messages
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
-        content: filteredContent,
+        content: responseText,
         sender: "klippy",
         createdAt: Date.now(),
       };
 
       addMessage(assistantMessage);
     } catch (error) {
-      console.error(error);
+      console.error("Error calling agent chat:", error);
+
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: crypto.randomUUID(),
+        content: `Error: ${error instanceof Error ? error.message : "Failed to get response from agent"}`,
+        sender: "klippy",
+        createdAt: Date.now(),
+      };
+
+      addMessage(errorMessage);
     } finally {
       setStreamingMessageContent("");
       setStatus("idle");
@@ -137,33 +126,3 @@ export function Chat({ style }: ChatProps) {
   );
 }
 
-/**
- * Filter the message content to get the text and animation key
- *
- * @param content - The content of the message
- * @returns The text and animation key
- */
-function filterMessageContent(content: string): {
-  text: string;
-  animationKey: string;
-} {
-  let text = content;
-  let animationKey = "";
-
-  if (content === "[") {
-    text = "";
-  } else if (/^\[[A-Za-z]*$/m.test(content)) {
-    text = content.replace(/^\[[A-Za-z]*$/m, "").trim();
-  } else {
-    // Check for animation keys in brackets
-    for (const key of ANIMATION_KEYS_BRACKETS) {
-      if (content.startsWith(key)) {
-        animationKey = key.slice(1, -1);
-        text = content.slice(key.length).trim();
-        break;
-      }
-    }
-  }
-
-  return { text, animationKey };
-}

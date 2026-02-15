@@ -53,6 +53,8 @@ export type KlippyApi = {
   offNewChat: () => void;
   // Clipboard
   clipboardWrite: (data: Data) => Promise<void>;
+  // Agent
+  agentChat: (message: string, sessionId: string) => Promise<any>;
 };
 
 declare global {

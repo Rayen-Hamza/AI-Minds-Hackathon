@@ -100,4 +100,30 @@ export function setupIpcListeners() {
   ipcMain.handle(IpcMessages.CLIPBOARD_WRITE, (_, data: Data) =>
     clipboard.write(data, "clipboard"),
   );
+
+  // Agent
+  ipcMain.handle(IpcMessages.AGENT_CHAT, async (_, message: string, sessionId: string) => {
+    try {
+      const response = await fetch("http://localhost:8000/agent/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message,
+          session_id: sessionId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error calling agent chat:", error);
+      throw error;
+    }
+  });
 }

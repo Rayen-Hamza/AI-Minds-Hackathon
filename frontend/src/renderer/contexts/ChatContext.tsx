@@ -7,32 +7,10 @@ import {
   useCallback,
 } from "react";
 import { Message } from "../components/Message";
-import { klippyApi, electronAi } from "../klippyApi";
-import { SharedStateContext } from "./SharedStateContext";
-import { areAnyModelsReadyOrDownloading } from "../../helpers/model-helpers";
-import { WelcomeMessageContent } from "../components/WelcomeMessageContent";
+import { klippyApi } from "../klippyApi";
 import { ChatRecord, MessageRecord } from "../../types/interfaces";
-import { useDebugState } from "./DebugContext";
-import { ANIMATION_KEYS_BRACKETS } from "../klippy-animation-helpers";
-import { ErrorLoadModelMessageContent } from "../components/ErrorLoadModelMessageContent";
 
-// Define types that are not exported from @electron/llm
-type LanguageModelPromptRole = "user" | "assistant" | "system";
-type LanguageModelPromptType = "text";
-
-interface LanguageModelPrompt {
-  role: LanguageModelPromptRole;
-  type: LanguageModelPromptType;
-  content: string;
-}
-
-interface LanguageModelCreateOptions {
-  modelAlias?: string;
-  systemPrompt?: string;
-  topK?: number;
-  temperature?: number;
-  initialPrompts?: LanguageModelPrompt[];
-}
+// Backend handles all model-related types and configuration
 
 type KlippyNamedStatus =
   | "welcome"
@@ -77,19 +55,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
   const [animationKey, setAnimationKey] = useState<string>("");
   const [status, setStatus] = useState<KlippyNamedStatus>("welcome");
-  const [isModelLoaded, setIsModelLoaded] = useState(false);
-  const { settings, models } = useContext(SharedStateContext);
-  const debug = useDebugState();
+  // Model is handled by backend, so always set to true
+  const [isModelLoaded] = useState(true);
   const [isChatWindowOpen, setIsChatWindowOpen] = useState(false);
-  const [hasPerformedStartupCheck, setHasPerformedStartupCheck] =
-    useState(false);
 
-  const getSystemPrompt = useCallback(() => {
-    return settings.systemPrompt.replace(
-      "[LIST OF ANIMATIONS]",
-      ANIMATION_KEYS_BRACKETS.join(", "),
-    );
-  }, [settings.systemPrompt]);
 
   const addMessage = useCallback(
     async (message: Message) => {
@@ -108,9 +77,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           setCurrentChatRecord(chatWithMessages.chat);
         }
 
-        await loadModel(
-          messagesToInitialPrompts(chatWithMessages?.messages || []),
-        );
+        // Model loading is handled by backend, no need to load here
+        // await loadModel(
+        //   messagesToInitialPrompts(chatWithMessages?.messages || []),
+        // );
       } catch (error) {
         console.error(error);
       }
@@ -146,42 +116,43 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages([]);
   }, [currentChatRecord, messages]);
 
-  const loadModel = useCallback(
-    async (initialPrompts: LanguageModelPrompt[] = []) => {
-      setIsModelLoaded(false);
+  // Backend handles model loading
+  // const loadModel = useCallback(
+  //   async (initialPrompts: LanguageModelPrompt[] = []) => {
+  //     setIsModelLoaded(false);
 
-      const options: LanguageModelCreateOptions = {
-        modelAlias: settings.selectedModel,
-        systemPrompt: getSystemPrompt(),
-        topK: settings.topK,
-        temperature: settings.temperature,
-        initialPrompts,
-      };
+  //     const options: LanguageModelCreateOptions = {
+  //       modelAlias: settings.selectedModel,
+  //       systemPrompt: getSystemPrompt(),
+  //       topK: settings.topK,
+  //       temperature: settings.temperature,
+  //       initialPrompts,
+  //     };
 
-      console.log("Loading model with options:", options);
+  //     console.log("Loading model with options:", options);
 
-      try {
-        await electronAi.create(options);
-        setIsModelLoaded(true);
-      } catch (error) {
-        console.error(error);
+  //     try {
+  //       await electronAi.create(options);
+  //       setIsModelLoaded(true);
+  //     } catch (error) {
+  //       console.error(error);
 
-        addMessage({
-          id: crypto.randomUUID(),
-          children: <ErrorLoadModelMessageContent error={error} />,
-          sender: "klippy",
-          createdAt: Date.now(),
-        });
-      }
-    },
-    [
-      settings.selectedModel,
-      settings.systemPrompt,
-      settings.topK,
-      settings.temperature,
-      messages,
-    ],
-  );
+  //       addMessage({
+  //         id: crypto.randomUUID(),
+  //         children: <ErrorLoadModelMessageContent error={error} />,
+  //         sender: "klippy",
+  //         createdAt: Date.now(),
+  //       });
+  //     }
+  //   },
+  //   [
+  //     settings.selectedModel,
+  //     settings.systemPrompt,
+  //     settings.topK,
+  //     settings.temperature,
+  //     messages,
+  //   ],
+  // );
 
   const deleteChat = useCallback(
     async (chatId: string) => {
@@ -228,49 +199,51 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     });
   }, [messages]);
 
+  // Model loading is handled by backend, no need to load on frontend
   // Load the model when the selected model changes
   // or when the system prompt, topK, or temperature change
-  useEffect(() => {
-    if (debug?.simulateDownload) {
-      setIsModelLoaded(true);
-      return;
-    }
+  // useEffect(() => {
+  //   if (debug?.simulateDownload) {
+  //     setIsModelLoaded(true);
+  //     return;
+  //   }
 
-    if (settings.selectedModel) {
-      loadModel();
-    } else if (!settings.selectedModel && isModelLoaded) {
-      electronAi
-        .destroy()
-        .then(() => {
-          setIsModelLoaded(false);
-        })
-        .catch((error: unknown) => {
-          console.error(error);
-        });
-    }
-  }, [
-    settings.selectedModel,
-    settings.systemPrompt,
-    settings.topK,
-    settings.temperature,
-  ]);
+  //   if (settings.selectedModel) {
+  //     loadModel();
+  //   } else if (!settings.selectedModel && isModelLoaded) {
+  //     electronAi
+  //       .destroy()
+  //       .then(() => {
+  //         setIsModelLoaded(false);
+  //       })
+  //       .catch((error: unknown) => {
+  //         console.error(error);
+  //       });
+  //   }
+  // }, [
+  //   settings.selectedModel,
+  //   settings.systemPrompt,
+  //   settings.topK,
+  //   settings.temperature,
+  // ]);
 
+  // Backend handles model selection, no need to manage on frontend
   // If selectedModel is undefined or not available, set it to the first downloaded model
-  useEffect(() => {
-    if (
-      !settings.selectedModel ||
-      !models[settings.selectedModel] ||
-      !models[settings.selectedModel].downloaded
-    ) {
-      const downloadedModel = Object.values(models).find(
-        (model) => model.downloaded,
-      );
+  // useEffect(() => {
+  //   if (
+  //     !settings.selectedModel ||
+  //     !models[settings.selectedModel] ||
+  //     !models[settings.selectedModel].downloaded
+  //   ) {
+  //     const downloadedModel = Object.values(models).find(
+  //       (model) => model.downloaded,
+  //     );
 
-      if (downloadedModel) {
-        klippyApi.setState("settings.selectedModel", downloadedModel.name);
-      }
-    }
-  }, [models]);
+  //     if (downloadedModel) {
+  //       klippyApi.setState("settings.selectedModel", downloadedModel.name);
+  //     }
+  //   }
+  // }, [models]);
 
   // At app startup, initially load the chat records from the main process
   useEffect(() => {
@@ -279,41 +252,42 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Backend handles models, no need to download on frontend
   // At app startup, check if any models are ready. If none are, kick off a download
   // for our smallest model and tell the user about it.
-  useEffect(() => {
-    if (
-      messages.length > 0 ||
-      Object.keys(models).length === 0 ||
-      areAnyModelsReadyOrDownloading(models)
-    ) {
-      return;
-    }
+  // useEffect(() => {
+  //   if (
+  //     messages.length > 0 ||
+  //     Object.keys(models).length === 0 ||
+  //     areAnyModelsReadyOrDownloading(models)
+  //   ) {
+  //     return;
+  //   }
 
-    if (hasPerformedStartupCheck) {
-      return;
-    }
+  //   if (hasPerformedStartupCheck) {
+  //     return;
+  //   }
 
-    setHasPerformedStartupCheck(true);
+  //   setHasPerformedStartupCheck(true);
 
-    addMessage({
-      id: crypto.randomUUID(),
-      children: <WelcomeMessageContent />,
-      content: "Welcome to Klippy!",
-      sender: "klippy",
-      createdAt: Date.now(),
-    });
+  //   addMessage({
+  //     id: crypto.randomUUID(),
+  //     children: <WelcomeMessageContent />,
+  //     content: "Welcome to Klippy!",
+  //     sender: "klippy",
+  //     createdAt: Date.now(),
+  //   });
 
-    const downloadModelIfNoneReady = async () => {
-      await klippyApi.downloadModelByName("Gemma 3 (1B)");
+  //   const downloadModelIfNoneReady = async () => {
+  //     await klippyApi.downloadModelByName("Gemma 3 (1B)");
 
-      setTimeout(async () => {
-        await klippyApi.updateModelState();
-      }, 500);
-    };
+  //     setTimeout(async () => {
+  //       await klippyApi.updateModelState();
+  //     }, 500);
+  //   };
 
-    void downloadModelIfNoneReady();
-  }, [models]);
+  //   void downloadModelIfNoneReady();
+  // }, [models]);
 
   // Subscribe to the main process's newChat event
   useEffect(() => {
@@ -381,13 +355,14 @@ function getPreviewFromMessages(messages: Message[]): string {
   return messages[0].content.replace(/\n/g, " ").substring(0, 100);
 }
 
-function messagesToInitialPrompts(messages: Message[]): LanguageModelPrompt[] {
-  return messages.map((message) => ({
-    role:
-      message.sender === "klippy"
-        ? ("assistant" as LanguageModelPromptRole)
-        : ("user" as LanguageModelPromptRole),
-    type: "text" as LanguageModelPromptType,
-    content: message.content || "",
-  }));
-}
+// Backend handles prompts
+// function messagesToInitialPrompts(messages: Message[]): LanguageModelPrompt[] {
+//   return messages.map((message) => ({
+//     role:
+//       message.sender === "klippy"
+//         ? ("assistant" as LanguageModelPromptRole)
+//         : ("user" as LanguageModelPromptRole),
+//     type: "text" as LanguageModelPromptType,
+//     content: message.content || "",
+//   }));
+// }

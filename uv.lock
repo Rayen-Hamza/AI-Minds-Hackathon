@@ -17,8 +17,11 @@ source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "fastapi" },
+    { name = "google-adk", extra = ["extensions"] },
+    { name = "google-genai" },
     { name = "imagehash" },
     { name = "langchain-text-splitters" },
+    { name = "litellm" },
     { name = "neo4j" },
     { name = "opencv-python" },
     { name = "pillow" },
@@ -42,9 +45,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "google-adk", extra = ["extensions"] },
     { name = "httpx" },
-    { name = "litellm" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
@@ -53,11 +54,12 @@ dev = [
 requires-dist = [
     { name = "aiofiles" },
     { name = "fastapi" },
-    { name = "google-adk", extras = ["extensions"], marker = "extra == 'dev'", specifier = ">=1.25.0" },
+    { name = "google-adk", extras = ["extensions"], specifier = ">=1.25.0" },
+    { name = "google-genai", specifier = ">=0.1.0" },
     { name = "httpx", marker = "extra == 'dev'" },
     { name = "imagehash" },
     { name = "langchain-text-splitters" },
-    { name = "litellm", marker = "extra == 'dev'", specifier = ">=1.80.16" },
+    { name = "litellm", specifier = ">=1.80.16" },
     { name = "neo4j" },
     { name = "opencv-python" },
     { name = "pillow" },

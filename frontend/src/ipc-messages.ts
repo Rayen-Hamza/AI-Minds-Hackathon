@@ -43,4 +43,7 @@ export const IpcMessages = {
 
   // Clipboard
   CLIPBOARD_WRITE: "klippy_clipboard_write",
+
+  // Agent
+  AGENT_CHAT: "klippy_agent_chat",
 };

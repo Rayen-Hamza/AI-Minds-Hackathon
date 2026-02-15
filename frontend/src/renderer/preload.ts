@@ -99,6 +99,10 @@ const klippyApi: KlippyApi = {
   // Clipboard
   clipboardWrite: (data: Data) =>
     ipcRenderer.invoke(IpcMessages.CLIPBOARD_WRITE, data),
+
+  // Agent
+  agentChat: (message: string, sessionId: string) =>
+    ipcRenderer.invoke(IpcMessages.AGENT_CHAT, message, sessionId),
 };
 
 contextBridge.exposeInMainWorld("klippy", klippyApi);

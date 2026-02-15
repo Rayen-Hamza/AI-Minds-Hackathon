@@ -6,8 +6,6 @@ export type BubbleView =
   | "chats"
   | "settings"
   | "settings-general"
-  | "settings-model"
-  | "settings-parameters"
   | "settings-advanced"
   | "settings-about";
 

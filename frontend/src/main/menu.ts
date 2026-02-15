@@ -150,7 +150,7 @@ function getFileMenu(): MenuItemConstructorOptions[] {
       { type: "separator" },
       {
         label: "Settings",
-        click: () => openView("settings-general"),
+        click: () => openView("settings-appearance"),
         accelerator: "CmdOrCtrl+,",
       },
       { type: "separator" },
@@ -188,17 +188,13 @@ function getSettingsMenuItem(): MenuItem {
     label: "Settings",
     submenu: Menu.buildFromTemplate([
       {
-        label: "General",
-        click: () => openView("settings-general"),
+        label: "Appearance",
+        click: () => openView("settings-appearance"),
         accelerator: "CmdOrCtrl+,",
       },
       {
-        label: "Model",
-        click: () => openView("settings-model"),
-      },
-      {
-        label: "Parameters",
-        click: () => openView("settings-parameters"),
+        label: "Preferences",
+        click: () => openView("settings-preferences"),
       },
       {
         label: "Advanced",

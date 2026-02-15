@@ -106,7 +106,7 @@ export function updateTrayMenu(): void {
       label: "Settings",
       click: () => {
         showMainWindow();
-        mainWindow?.webContents.send(IpcMessages.SET_BUBBLE_VIEW, "settings-general");
+        mainWindow?.webContents.send(IpcMessages.SET_BUBBLE_VIEW, "settings-appearance");
       },
     },
     { type: "separator" },

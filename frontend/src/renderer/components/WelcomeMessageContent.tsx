@@ -58,8 +58,8 @@ export const WelcomeMessageContent: React.FC = () => {
         </div>
       )}
 
-      <button onClick={() => setCurrentView("settings-model")} style={{ marginTop: 8 }}>
-        ⚙ Open Model Settings
+      <button onClick={() => setCurrentView("settings")} style={{ marginTop: 8 }}>
+        ⚙ Open Settings
       </button>
     </div>
   );
