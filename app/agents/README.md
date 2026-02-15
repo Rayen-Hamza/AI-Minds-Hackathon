@@ -5,26 +5,32 @@ This directory contains Google ADK (Agent Development Kit) agents for the multim
 ## Agents
 
 ### 1. Orchestrator Agent (`orchestrator.py`)
+
 The main coordinator agent that:
+
 - Routes user requests to appropriate specialized agents
 - Manages conversation flow
 - Provides system information and status
 - Coordinates multi-agent tasks
 
 **Tools:**
+
 - `get_system_status()` - Get overall system status
 - `get_capabilities()` - List system capabilities
 - `analyze_request()` - Analyze and route user requests
 - `AgentTool(qdrant_agent)` - Delegate to Qdrant agent
 
 ### 2. Qdrant Agent (`qdrant_agent.py`)
+
 Specialized agent for vector database operations:
+
 - Semantic search across all content types (text, images, audio)
 - Collection management
 - Vector database statistics
 - Filter-based retrieval
 
 **Tools:**
+
 - `search_vectors()` - Perform semantic search
 - `get_collection_info()` - Get collection details
 - `list_collections()` - List all collections
@@ -41,35 +47,47 @@ The agents require Google ADK which is already in `pyproject.toml`:
 uv sync
 ```
 
-### 2. Set API Key
+### 2. Start Ollama
 
-Create or update `.env` file with your Google API key:
+The agents use **Qwen2.5:3b** via Ollama for local inference:
 
 ```bash
-# Google Gemini API Key (required)
-GOOGLE_API_KEY=your_api_key_here
+# Start Ollama (if not already running)
+ollama serve
 
-# Use API key directly (not Vertex AI)
-GOOGLE_GENAI_USE_VERTEXAI=False
+# Pull the model (first time only)
+ollama pull qwen2.5:3b
 ```
 
-Get your API key from: https://aistudio.google.com/app/apikey
+### 3. Configure Environment
 
-### 3. Configure Model (Optional)
+Create or update `.env` file:
 
-The agents use `gemini-2.0-flash-exp` by default. You can change this in the agent files:
+```bash
+# LLM Configuration (Ollama)
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen2.5:3b
+LLM_BASE_URL=http://localhost:11434/v1
+```
+
+### 4. Configure Model (Optional)
+
+The agents use `qwen2.5:3b` via LiteLLM by default. You can change this in the agent files:
 
 ```python
+from google.adk.models.lite_llm import LiteLlm
+
 root_agent = Agent(
-    model="gemini-2.0-flash-exp",  # Change this
+    model=LiteLlm(model="ollama/qwen2.5:3b"),
     ...
 )
 ```
 
-Supported models:
-- `gemini-2.0-flash-exp` (default, fast and capable)
-- `gemini-2.5-flash` (latest stable)
-- `gemini-pro` (production-ready)
+Supported local models:
+
+- `qwen2.5:3b` (default, excellent multilingual + tool calling)
+- `qwen2.5:7b` (larger, more capable)
+- `llama3.2:3b` (alternative small model)
 
 ## Usage
 
@@ -236,6 +254,8 @@ response2 = requests.post(
 Add new tools to agents by defining functions:
 
 ```python
+from google.adk.models.lite_llm import LiteLlm
+
 def my_custom_tool(arg: str) -> dict:
     """Tool description for the LLM."""
     # Your implementation
@@ -244,7 +264,7 @@ def my_custom_tool(arg: str) -> dict:
 # Add to agent
 my_agent = Agent(
     name="my_agent",
-    model="gemini-2.0-flash-exp",
+    model=LiteLlm(model="ollama/qwen2.5:3b"),
     tools=[
         FunctionTool(func=my_custom_tool),
         # ... other tools
@@ -257,6 +277,8 @@ my_agent = Agent(
 Add callbacks for logging, monitoring, or validation:
 
 ```python
+from google.adk.models.lite_llm import LiteLlm
+
 async def before_model_callback(context):
     """Called before LLM invocation."""
     logger.info(f"Calling model with: {context.message}")
@@ -265,7 +287,7 @@ async def before_model_callback(context):
 
 root_agent = Agent(
     name="root",
-    model="gemini-2.0-flash-exp",
+    model=LiteLlm(model="ollama/qwen2.5:3b"),
     before_model_callback=before_model_callback,
     ...
 )
@@ -278,31 +300,36 @@ Use different LLMs via LiteLLM:
 ```python
 from google.adk.models.lite_llm import LiteLlm
 
-# Use GPT-4
-gpt_model = LiteLlm(model="openai/gpt-4")
+# Use Qwen via Ollama (default)
+qwen_model = LiteLlm(model="ollama/qwen2.5:3b")
 
-# Use Claude
-claude_model = LiteLlm(model="anthropic/claude-sonnet-4")
+# Use Llama via Ollama
+llama_model = LiteLlm(model="ollama/llama3.2:3b")
+
+# Use cloud models (if API keys configured)
+# gpt_model = LiteLlm(model="openai/gpt-4")
 
 agent = Agent(
     name="multi_model_agent",
-    model=gpt_model,
+    model=qwen_model,
     ...
 )
 ```
 
 ## Troubleshooting
 
-### API Key Issues
+### Ollama Connection Issues
 
-If you see authentication errors:
-1. Verify your API key is set: `echo $GOOGLE_API_KEY`
-2. Check the key is valid at https://aistudio.google.com/app/apikey
-3. Ensure `GOOGLE_GENAI_USE_VERTEXAI=False` is set
+If you see LLM connection errors:
+
+1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
+2. Check the model is pulled: `ollama list`
+3. Ensure `LLM_BASE_URL=http://localhost:11434/v1` is set in `.env`
 
 ### Import Errors
 
 If agents fail to import:
+
 ```bash
 # Reinstall dependencies
 uv sync
@@ -314,6 +341,7 @@ uv pip list | grep google-adk
 ### Connection Errors
 
 If Qdrant connection fails:
+
 ```bash
 # Start Qdrant
 docker-compose up -d
@@ -325,8 +353,9 @@ curl http://localhost:6333/health
 ## Documentation
 
 - **Google ADK Docs:** https://google.github.io/adk-docs/
-- **Gemini API:** https://ai.google.dev/gemini-api/docs
-- **ADK GitHub:** https://github.com/google/adk
+- **Ollama:** https://ollama.ai/
+- **LiteLLM:** https://docs.litellm.ai/
+- **Qwen2.5:** https://huggingface.co/Qwen/Qwen2.5-3B-Instruct
 
 ## Next Steps
 
