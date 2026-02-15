@@ -16,6 +16,7 @@ from google.genai.types import Content, Part
 
 from ..agents import root_agent, qdrant_agent, neo4j_agent, run_prompt_chain
 from ..memory import record_event, get_context
+from ..services.processing.content_sanitizer import sanitize_ingested_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agents"])
@@ -134,8 +135,15 @@ async def chat_with_agent(request: AgentRequest):
             logger.info(
                 f"Enriching message with memory context (session: {session_id})"
             )
-            # Inject memory context as a system-level instruction
-            enriched_message = f"{memory_context}\n\nUser query: {request.message}"
+            # Sanitize memory context — it may contain content originally
+            # ingested from untrusted files that could carry injection payloads.
+            safe_context = sanitize_ingested_text(memory_context, source="memory")
+            # Inject memory context wrapped in XML fences so the LLM
+            # treats it as data rather than instructions.
+            enriched_message = (
+                f"<memory_context>\n{safe_context}\n</memory_context>\n\n"
+                f"User query: {request.message}"
+            )
 
         # Create user message with enriched context
         user_message = Content(role="user", parts=[Part(text=enriched_message)])
