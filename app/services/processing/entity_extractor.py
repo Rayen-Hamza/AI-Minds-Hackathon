@@ -219,6 +219,108 @@ class EntityExtractor:
             logger.error(f"Error in batch entity extraction: {e}")
             return [[] for _ in texts]
 
+    # ========================================================================
+    # Relationship Extraction (predicate linking)
+    # ========================================================================
+
+    def extract_relationships(self, text: str) -> list[dict[str, str]]:
+        """
+        Extract subject-predicate-object triples from text using
+        spaCy dependency parsing.  Used for building Neo4j edges.
+
+        Args:
+            text: Input text
+
+        Returns:
+            List of dicts with 'subject', 'predicate', 'object' keys
+        """
+        try:
+            if not text or not text.strip():
+                return []
+
+            doc = self.nlp(text)
+            relationships: list[dict[str, str]] = []
+
+            for sent in doc.sents:
+                # Find verbs and their subject/object dependencies
+                for token in sent:
+                    if token.pos_ != "VERB":
+                        continue
+
+                    subject = None
+                    obj = None
+
+                    for child in token.children:
+                        if child.dep_ in ("nsubj", "nsubjpass"):
+                            # Expand to full noun phrase
+                            subject = self._expand_noun_phrase(child)
+                        if child.dep_ in ("dobj", "pobj", "attr", "dative"):
+                            obj = self._expand_noun_phrase(child)
+
+                    # Also look at prepositional complements
+                    if obj is None:
+                        for child in token.children:
+                            if child.dep_ == "prep":
+                                for pobj in child.children:
+                                    if pobj.dep_ == "pobj":
+                                        obj = self._expand_noun_phrase(pobj)
+                                        break
+                                if obj:
+                                    break
+
+                    if subject and obj:
+                        relationships.append({
+                            "subject": subject,
+                            "predicate": token.lemma_,
+                            "object": obj,
+                        })
+
+            logger.debug(
+                f"Extracted {len(relationships)} relationships from text "
+                f"({len(text)} chars)"
+            )
+            return relationships
+
+        except Exception as e:
+            logger.error(f"Error extracting relationships: {e}")
+            return []
+
+    def _expand_noun_phrase(self, token) -> str:
+        """
+        Expand a token to its full noun phrase using subtree span.
+
+        Args:
+            token: spaCy Token
+
+        Returns:
+            Full noun phrase string
+        """
+        # Use the token's subtree to get the full phrase
+        span = token.doc[token.left_edge.i : token.right_edge.i + 1]
+        return span.text.strip()
+
+    def extract_entities_and_relationships(
+        self, text: str
+    ) -> dict:
+        """
+        Extract both entities and relationships in a single pass.
+        Returns structured data ready for graph construction.
+
+        Args:
+            text: Input text
+
+        Returns:
+            Dict with 'entities' (list of {text, label}) and
+            'relationships' (list of {subject, predicate, object})
+        """
+        entities = self.extract_entities_with_labels(text)
+        relationships = self.extract_relationships(text)
+
+        return {
+            "entities": entities,
+            "relationships": relationships,
+        }
+
 
 # Global singleton instance
 _entity_extractor: Optional[EntityExtractor] = None

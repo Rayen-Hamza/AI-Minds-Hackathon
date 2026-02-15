@@ -1,6 +1,7 @@
 """
 Image processing pipeline for metadata extraction, OCR, and captioning.
-Handles EXIF data, OCR text detection, and image caption generation.
+Text-centric approach: images are converted to text (caption + OCR)
+before embedding with the unified text model.
 """
 
 import logging
@@ -11,15 +12,11 @@ import uuid
 
 from PIL import Image
 from PIL.ExifTags import TAGS
-import pytesseract
-import cv2
-import numpy as np
 
 from app.models.models import ImageData
 from app.services.storage.content_hasher import get_content_hasher
-from app.services.embeddings.caption_strategy import get_caption_embedder
-from app.config import settings
 from .entity_extractor import get_entity_extractor
+from .text_extractor import ImageTextExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -27,29 +24,24 @@ logger = logging.getLogger(__name__)
 class ImageProcessor:
     """
     Processes images for embedding and storage.
-    Extracts metadata, performs OCR, generates captions, and extracts entities.
+    Extracts metadata, performs OCR, generates captions via BLIP,
+    and extracts entities for graph construction.
     """
 
     def __init__(self):
         """Initialize image processor."""
         self.hasher = get_content_hasher()
         self.entity_extractor = get_entity_extractor()
-        self._caption_embedder = None  # Lazy load
+        self._text_extractor = None  # Lazy load
 
-        logger.info("Initialized ImageProcessor")
+        logger.info("Initialized ImageProcessor (text-centric)")
 
     @property
-    def caption_embedder(self):
-        """Lazy-load caption embedder."""
-        if self._caption_embedder is None:
-            try:
-                self._caption_embedder = get_caption_embedder(
-                    settings.text_to_image_model
-                )
-            except Exception as e:
-                logger.warning(f"Failed to load caption embedder: {e}")
-                self._caption_embedder = None
-        return self._caption_embedder
+    def text_extractor(self) -> ImageTextExtractor:
+        """Lazy-load image text extractor (BLIP + OCR)."""
+        if self._text_extractor is None:
+            self._text_extractor = ImageTextExtractor()
+        return self._text_extractor
 
     def extract_exif(self, image_path: str | Path) -> dict:
         """
@@ -91,35 +83,7 @@ class ImageProcessor:
         Returns:
             Extracted text or None if no text detected
         """
-        try:
-            # Read image with OpenCV
-            img = cv2.imread(str(image_path))
-
-            if img is None:
-                logger.warning(f"Could not read image for OCR: {image_path}")
-                return None
-
-            # Convert to grayscale
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-            # Apply thresholding for better OCR results
-            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-            # Perform OCR
-            text = pytesseract.image_to_string(thresh)
-
-            if text and text.strip():
-                logger.debug(
-                    f"OCR extracted {len(text)} chars from {Path(image_path).name}"
-                )
-                return text.strip()
-            else:
-                logger.debug(f"No text detected in {Path(image_path).name}")
-                return None
-
-        except Exception as e:
-            logger.warning(f"Error performing OCR on {image_path}: {e}")
-            return None
+        return self.text_extractor.perform_ocr(image_path)
 
     def generate_caption(self, image_path: str | Path) -> Optional[str]:
         """
@@ -132,13 +96,7 @@ class ImageProcessor:
             Generated caption or None if unavailable
         """
         try:
-            if self.caption_embedder is None:
-                logger.warning(
-                    "Caption embedder not available, skipping caption generation"
-                )
-                return None
-
-            caption = self.caption_embedder.generate_caption(image_path)
+            caption = self.text_extractor.generate_caption(image_path)
             logger.debug(f"Generated caption for {Path(image_path).name}: '{caption}'")
             return caption
 

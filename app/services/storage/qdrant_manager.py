@@ -17,7 +17,6 @@ from qdrant_client.models import (
     MatchValue,
     MatchAny,
     ScoredPoint,
-    NamedVector,
 )
 from qdrant_client.http.exceptions import UnexpectedResponse
 
@@ -30,11 +29,7 @@ from app.models.models import (
     CollectionName,
     SearchResult,
 )
-from ..embeddings import (
-    get_text_embedder,
-    get_image_embedder,
-    get_caption_embedder,
-)
+from ..embeddings import get_text_embedder
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +54,8 @@ class QdrantManager:
         # Initialize client
         self.client = QdrantClient(host=self.host, port=self.port)
 
-        # Lazy-loaded embedders
+        # Lazy-loaded text embedder (single model for all modalities)
         self._text_embedder = None
-        self._image_embedder = None
-        self._caption_embedder = None
 
         logger.info(f"Initialized QdrantManager connected to {self.host}:{self.port}")
 
@@ -73,55 +66,23 @@ class QdrantManager:
             self._text_embedder = get_text_embedder()
         return self._text_embedder
 
-    @property
-    def image_embedder(self):
-        """Lazy-load image embedder."""
-        if self._image_embedder is None:
-            self._image_embedder = get_image_embedder()
-        return self._image_embedder
-
-    @property
-    def caption_embedder(self):
-        """Lazy-load caption embedder."""
-        if self._caption_embedder is None:
-            self._caption_embedder = get_caption_embedder(settings.text_to_image_model)
-        return self._caption_embedder
-
     # ========================================================================
     # Collection Setup
     # ========================================================================
 
     def create_collections(self) -> None:
-        """Create unified collection with named vectors for all modalities."""
+        """Create unified collection with single text vector for all modalities."""
         try:
-            logger.info("Creating unified Qdrant collection...")
+            logger.info("Creating unified Qdrant collection (text-centric)...")
 
-            # Create single collection with named vectors for all modalities
+            # Single text_vector for all content types
+            # All modalities are converted to text before embedding
             if not self.client.collection_exists(settings.unified_collection):
                 self.client.create_collection(
                     collection_name=settings.unified_collection,
                     vectors_config={
-                        # Text chunks and audio transcripts use text embeddings
                         "text_vector": VectorParams(
                             size=settings.text_embedding_dim,
-                            distance=Distance.COSINE,
-                            hnsw_config={
-                                "m": settings.hnsw_m,
-                                "ef_construct": settings.hnsw_ef_construct,
-                            },
-                        ),
-                        # Image similarity (DINOv2)
-                        "image_vector": VectorParams(
-                            size=settings.image_embedding_dim,
-                            distance=Distance.COSINE,
-                            hnsw_config={
-                                "m": settings.hnsw_m,
-                                "ef_construct": settings.hnsw_ef_construct,
-                            },
-                        ),
-                        # Text-to-image search (SigLIP)
-                        "text_to_image_vector": VectorParams(
-                            size=settings.text_to_image_dim,
                             distance=Distance.COSINE,
                             hnsw_config={
                                 "m": settings.hnsw_m,
@@ -131,7 +92,8 @@ class QdrantManager:
                     },
                 )
                 logger.info(
-                    f"Created unified collection: {settings.unified_collection} with named vectors"
+                    f"Created unified collection: {settings.unified_collection} "
+                    f"with single text_vector ({settings.text_embedding_dim}-dim)"
                 )
 
                 # Create payload indexes for efficient filtering
@@ -265,7 +227,8 @@ class QdrantManager:
 
     def upsert_image(self, image_data: ImageData) -> str:
         """
-        Upsert image with DINOv2 (image similarity) and SigLIP (text-to-image) embeddings.
+        Upsert image as text embedding (text-centric approach).
+        The image's caption + OCR text are embedded with the text model.
 
         Args:
             image_data: ImageData object
@@ -274,15 +237,19 @@ class QdrantManager:
             Point ID
         """
         try:
-            logger.info(f"Upserting image: {image_data.image_path}")
+            logger.info(f"Upserting image (text-centric): {image_data.image_path}")
 
-            # Generate DINOv2 image embedding for image-to-image similarity
-            image_embedding = self.image_embedder.embed(image_data.image_path)
+            # Build text representation from caption + OCR
+            text_parts = []
+            if image_data.caption:
+                text_parts.append(image_data.caption)
+            if image_data.ocr_text:
+                text_parts.append(f"Text in image: {image_data.ocr_text}")
 
-            # For text-to-image search, we need the caption embedder (SigLIP)
-            # This embeds both the image and text in the same space
-            caption_text = image_data.caption or image_data.ocr_text or "image"
-            text_to_image_embedding = self.caption_embedder.embed(image_data.image_path)
+            chunk_text = ". ".join(text_parts) if text_parts else f"Image: {Path(image_data.image_path).name}"
+
+            # Embed text representation with the same text model
+            text_embedding = self.text_embedder.embed(chunk_text)
 
             # Create point ID
             point_id = str(uuid.uuid4())
@@ -293,7 +260,7 @@ class QdrantManager:
                 content_type="image",
                 file_type=Path(image_data.image_path).suffix.lstrip("."),
                 chunk_index=0,
-                chunk_text=caption_text,
+                chunk_text=chunk_text,
                 content_hash=image_data.content_hash,
                 parent_doc_id=image_data.parent_doc_id,
                 file_size=image_data.file_size,
@@ -309,13 +276,10 @@ class QdrantManager:
                 caption=image_data.caption,
             )
 
-            # Create point with named vectors
+            # Single text_vector — same space as text and audio
             point = PointStruct(
                 id=point_id,
-                vector={
-                    "image_vector": image_embedding,  # DINOv2 for image similarity
-                    "text_to_image_vector": text_to_image_embedding,  # SigLIP for text-to-image
-                },
+                vector={"text_vector": text_embedding},
                 payload=payload.model_dump(exclude_none=True),
             )
 
@@ -535,11 +499,12 @@ class QdrantManager:
         score_threshold: Optional[float] = None,
     ) -> list[SearchResult]:
         """
-        Search using text query across text and/or audio content.
+        Search using text query. Delegates to search_unified.
+        Kept for backwards compatibility.
 
         Args:
             query_text: Text query
-            content_types: Filter by content types (e.g., ["text", "audio"]), None = both
+            content_types: Filter by content types, None = all
             limit: Max results
             filters: Optional additional filters
             score_threshold: Min score
@@ -547,39 +512,67 @@ class QdrantManager:
         Returns:
             List of SearchResult objects
         """
+        return self.search_unified(
+            query_text=query_text,
+            content_types=content_types,
+            limit=limit,
+            filters=filters,
+            score_threshold=score_threshold,
+        )
+
+    def search_unified(
+        self,
+        query_text: str,
+        content_types: Optional[list[str]] = None,
+        limit: int = 10,
+        filters: Optional[dict] = None,
+        score_threshold: Optional[float] = None,
+    ) -> list[SearchResult]:
+        """
+        Unified search across ALL content types using the same text_vector.
+        Text-centric approach: all content is in the same embedding space.
+
+        Args:
+            query_text: Text query
+            content_types: Optional filter (e.g., ["image"], ["text", "audio"])
+            limit: Max results
+            filters: Optional filters
+            score_threshold: Min score
+
+        Returns:
+            List of SearchResult objects
+        """
         try:
-            # Embed query
+            # Embed query with the single text model
             query_embedding = self.text_embedder.embed(query_text)
 
-            # Build filter to search text and audio content
-            if content_types is None:
-                content_types = ["text", "audio"]
-
-            # Merge content_type filter with any existing filters
+            # Build filters
             search_filters = filters or {}
             if "must" not in search_filters:
                 search_filters["must"] = []
 
-            # Add content_type filter
-            if len(content_types) == 1:
-                search_filters["must"].append(
-                    FieldCondition(
-                        key="content_type", match=MatchValue(value=content_types[0])
+            # Optionally filter by content type
+            if content_types:
+                if len(content_types) == 1:
+                    search_filters["must"].append(
+                        FieldCondition(
+                            key="content_type",
+                            match=MatchValue(value=content_types[0]),
+                        )
                     )
-                )
-            else:
-                # Multiple content types, use MatchAny
-                search_filters["must"].append(
-                    FieldCondition(
-                        key="content_type", match=MatchAny(any=content_types)
+                else:
+                    search_filters["must"].append(
+                        FieldCondition(
+                            key="content_type",
+                            match=MatchAny(any=content_types),
+                        )
                     )
-                )
 
             scored_points = self.semantic_search(
                 collection=settings.unified_collection,
                 query_vector=query_embedding,
                 limit=limit,
-                filters=search_filters,
+                filters=search_filters if search_filters["must"] else None,
                 score_threshold=score_threshold,
                 vector_name="text_vector",
             )
@@ -598,125 +591,7 @@ class QdrantManager:
             return results
 
         except Exception as e:
-            logger.error(f"Error in text search: {e}")
-            raise
-
-    def search_image_by_text(
-        self,
-        query_text: str,
-        limit: int = 10,
-        filters: Optional[dict] = None,
-        score_threshold: Optional[float] = None,
-    ) -> list[SearchResult]:
-        """
-        Search images using text query (via SigLIP text-to-image embeddings).
-
-        Args:
-            query_text: Text query
-            limit: Max results
-            filters: Optional filters
-            score_threshold: Min score
-
-        Returns:
-            List of SearchResult objects
-        """
-        try:
-            # Embed query text using caption embedder (SigLIP)
-            query_embedding = self.caption_embedder.embed_text(query_text)
-
-            # Build filter for image content
-            search_filters = filters or {}
-            if "must" not in search_filters:
-                search_filters["must"] = []
-
-            search_filters["must"].append(
-                FieldCondition(key="content_type", match=MatchValue(value="image"))
-            )
-
-            # Search using text_to_image_vector
-            scored_points = self.semantic_search(
-                collection=settings.unified_collection,
-                query_vector=query_embedding,
-                limit=limit,
-                filters=search_filters,
-                score_threshold=score_threshold,
-                vector_name="text_to_image_vector",
-            )
-
-            results = []
-            for sp in scored_points:
-                payload = VectorPayload(**sp.payload)
-                result = SearchResult(
-                    id=sp.id,
-                    score=sp.score,
-                    collection=settings.unified_collection,
-                    payload=payload,
-                )
-                results.append(result)
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Error in image text search: {e}")
-            raise
-
-    def search_image_by_image(
-        self,
-        image_path: str,
-        limit: int = 10,
-        filters: Optional[dict] = None,
-        score_threshold: Optional[float] = None,
-    ) -> list[SearchResult]:
-        """
-        Search similar images using image query (DINOv2 embeddings).
-
-        Args:
-            image_path: Path to query image
-            limit: Max results
-            filters: Optional filters
-            score_threshold: Min score
-
-        Returns:
-            List of SearchResult objects
-        """
-        try:
-            # Generate DINOv2 embedding for query image
-            query_embedding = self.image_embedder.embed(image_path)
-
-            # Build filter for image content
-            search_filters = filters or {}
-            if "must" not in search_filters:
-                search_filters["must"] = []
-
-            search_filters["must"].append(
-                FieldCondition(key="content_type", match=MatchValue(value="image"))
-            )
-
-            # Search using image_vector
-            scored_points = self.semantic_search(
-                collection=settings.unified_collection,
-                query_vector=query_embedding,
-                limit=limit,
-                filters=search_filters,
-                score_threshold=score_threshold,
-                vector_name="image_vector",
-            )
-
-            results = []
-            for sp in scored_points:
-                payload = VectorPayload(**sp.payload)
-                result = SearchResult(
-                    id=sp.id,
-                    score=sp.score,
-                    collection=settings.unified_collection,
-                    payload=payload,
-                )
-                results.append(result)
-
-            return results
-
-        except Exception as e:
-            logger.error(f"Error in image similarity search: {e}")
+            logger.error(f"Error in unified search: {e}")
             raise
 
     def search_by_hash(self, collection: str, content_hash: str) -> list[ScoredPoint]:

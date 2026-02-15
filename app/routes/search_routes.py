@@ -1,6 +1,7 @@
 """
 FastAPI routes for search operations.
-Handles semantic search across text, images, and audio.
+Unified text-centric search across all modalities (text, images, audio).
+All content is in the same embedding space — single search covers everything.
 """
 
 import logging
@@ -28,65 +29,33 @@ qdrant_manager = get_qdrant_manager()
 
 
 # ============================================================================
-# Text Search
+# Unified Search (text-centric — all modalities in same vector space)
 # ============================================================================
 
 
 @router.post("", response_model=SearchResponse)
 async def search_all(request: SearchRequest):
     """
-    Search across all collections using text query.
+    Unified search across ALL content types (text, images, audio).
+    All modalities are converted to text and embedded in the same space,
+    so a single search returns results from every modality.
 
     Args:
         request: Search request with query text
 
     Returns:
-        SearchResponse with ranked results
+        SearchResponse with ranked results from all modalities
     """
     try:
-        logger.info(f"Searching all collections for: '{request.query}'")
+        logger.info(f"Unified search for: '{request.query}'")
 
-        # Search across content types using unified collection
-        results = []
-
-        if request.collection:
-            # Search specific content type
-            if request.collection == CollectionName.UNIFIED:
-                # Search all content types (text, image, audio)
-                text_results = qdrant_manager.search_text(
-                    query_text=request.query,
-                    content_types=["text", "audio"],
-                    limit=request.limit,
-                    filters=request.filters,
-                    score_threshold=request.score_threshold,
-                )
-                image_results = qdrant_manager.search_image_by_text(
-                    query_text=request.query,
-                    limit=request.limit,
-                    filters=request.filters,
-                    score_threshold=request.score_threshold,
-                )
-                results = text_results + image_results
-                results.sort(key=lambda x: x.score, reverse=True)
-                results = results[: request.limit]
-        else:
-            # Search all content types
-            text_results = qdrant_manager.search_text(
-                query_text=request.query,
-                content_types=["text", "audio"],
-                limit=request.limit,
-                filters=request.filters,
-                score_threshold=request.score_threshold,
-            )
-            image_results = qdrant_manager.search_image_by_text(
-                query_text=request.query,
-                limit=request.limit,
-                filters=request.filters,
-                score_threshold=request.score_threshold,
-            )
-            results = text_results + image_results
-            results.sort(key=lambda x: x.score, reverse=True)
-            results = results[: request.limit]
+        # Single search across everything — no fusion needed
+        results = qdrant_manager.search_unified(
+            query_text=request.query,
+            limit=request.limit,
+            filters=request.filters,
+            score_threshold=request.score_threshold,
+        )
 
         return SearchResponse(
             results=results,
@@ -115,24 +84,13 @@ async def search_collection(collection: CollectionName, request: SearchRequest):
     try:
         logger.info(f"Searching unified collection for: '{request.query}'")
 
-        # Search all content types in unified collection
-        text_results = qdrant_manager.search_text(
-            query_text=request.query,
-            content_types=["text", "audio"],
-            limit=request.limit,
-            filters=request.filters,
-            score_threshold=request.score_threshold,
-        )
-        image_results = qdrant_manager.search_image_by_text(
+        # Single unified search — all modalities in the same vector space
+        results = qdrant_manager.search_unified(
             query_text=request.query,
             limit=request.limit,
             filters=request.filters,
             score_threshold=request.score_threshold,
         )
-
-        results = text_results + image_results
-        results.sort(key=lambda x: x.score, reverse=True)
-        results = results[: request.limit]
 
         return SearchResponse(
             results=results,
@@ -147,58 +105,52 @@ async def search_collection(collection: CollectionName, request: SearchRequest):
 
 
 # ============================================================================
-# Image Search
+# Filtered Search
 # ============================================================================
 
 
-@router.post("/image", response_model=SearchResponse)
-async def search_by_image(
-    file: UploadFile = File(...),
-    limit: int = Query(10, ge=1, le=100),
-    score_threshold: Optional[float] = Query(None, ge=0.0, le=1.0),
-):
+@router.post("/by-type/{content_type}", response_model=SearchResponse)
+async def search_by_content_type(content_type: str, request: SearchRequest):
     """
-    Search for similar images using an uploaded image.
+    Search filtered by content type (text, image, audio).
+    Uses the same text_vector — just filters results.
 
     Args:
-        file: Query image file
-        limit: Maximum results
-        score_threshold: Minimum similarity score
+        content_type: Filter to 'text', 'image', or 'audio'
+        request: Search request
 
     Returns:
-        SearchResponse with similar images
+        SearchResponse with results of the specified type only
     """
     try:
-        logger.info(f"Image similarity search with uploaded file: {file.filename}")
+        valid_types = {"text", "image", "audio"}
+        if content_type not in valid_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid content_type. Must be one of: {valid_types}",
+            )
 
-        # Save uploaded file temporarily
-        temp_path = Path(f"/tmp/query_{file.filename}")
-        async with aiofiles.open(temp_path, "wb") as f:
-            content_bytes = await file.read()
-            await f.write(content_bytes)
+        logger.info(f"Searching {content_type} for: '{request.query}'")
 
-        # Search for similar images
-        results = qdrant_manager.search_image_by_image(
-            image_path=str(temp_path),
-            limit=limit,
-            filters=None,
-            score_threshold=score_threshold,
+        results = qdrant_manager.search_unified(
+            query_text=request.query,
+            content_types=[content_type],
+            limit=request.limit,
+            filters=request.filters,
+            score_threshold=request.score_threshold,
         )
-
-        # Clean up
-        temp_path.unlink()
 
         return SearchResponse(
             results=results,
-            query=f"Image similarity: {file.filename}",
+            query=request.query,
             total_results=len(results),
             collections_searched=[settings.unified_collection],
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in image search: {e}")
-        if temp_path.exists():
-            temp_path.unlink()
+        logger.error(f"Error in filtered search: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
