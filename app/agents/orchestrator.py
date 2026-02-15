@@ -11,6 +11,7 @@ from google.adk.models import LiteLlm
 
 from .qdrant_agent import qdrant_agent
 from .neo4j_agent import neo4j_agent
+from .prompt_chain import chain_agent, run_prompt_chain
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,61 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Orchestrator Tools
 # ============================================================================
+
+
+def answer_with_reasoning(user_query: str) -> Dict[str, Any]:
+    """
+    Answer a question using the full prompt chaining pipeline.
+    
+    This tool:
+    1. Enriches the query with ontological reasoning from Neo4j
+    2. Searches Qdrant for relevant RAG context
+    3. Builds a context-limited prompt for the small LLM
+    4. Returns the final answer
+    
+    Use this for complex questions that benefit from knowledge graph reasoning
+    combined with semantic search.
+    
+    Args:
+        user_query: The user's question
+        
+    Returns:
+        Dictionary with the reasoned answer and metadata
+    """
+    try:
+        logger.info(f"Running prompt chain for: {user_query[:50]}...")
+        
+        # Execute the full prompt chaining pipeline
+        result = run_prompt_chain(user_query)
+        
+        if not result.get("success"):
+            return {
+                "success": False,
+                "error": result.get("error", "Unknown error in prompt chain"),
+                "query": user_query,
+            }
+        
+        return {
+            "success": True,
+            "query": user_query,
+            "prompt": result.get("final_prompt", ""),
+            "token_estimate": result.get("token_estimate", 0),
+            "has_graph_reasoning": result.get("has_reasoning", False),
+            "has_rag_context": result.get("has_rag", False),
+            "confidence": result.get("confidence", 0.0),
+            "entities_found": result.get("entities_found", []),
+            "rag_results_count": result.get("rag_results_count", 0),
+            "source_files": result.get("source_files", []),
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in answer_with_reasoning: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "query": user_query,
+            "source_files": [],
+        }
 
 
 def get_system_status() -> Dict[str, Any]:
@@ -279,7 +335,10 @@ Routing Strategy:
 - Search/find content (photos, images, text, audio, documents) → delegate to qdrant_agent IMMEDIATELY
 - Entity, person, event, graph questions → delegate to neo4j_agent
 - System status → use get_system_status
-- Help/capabilities → use get_capabilities
+- Help/capabilities/capabilities → use get_capabilities
+
+Be conversational, helpful, and leverage memory context to provide personalized responses.
+- Request analysis → use analyze_request
 
 MANDATORY DELEGATION PROTOCOL:
 ANY query asking to find, search, show, retrieve, or locate content MUST be delegated to qdrant_agent using AgentTool.
@@ -311,10 +370,12 @@ When qdrant_agent returns results:
 
 YOUR ONLY JOB: Route queries correctly. For search → use qdrant_agent. Always.""",
     tools=[
+        FunctionTool(func=answer_with_reasoning),
         FunctionTool(func=get_system_status),
         FunctionTool(func=get_capabilities),
         FunctionTool(func=analyze_request),
         AgentTool(agent=qdrant_agent),
         AgentTool(agent=neo4j_agent),
+        AgentTool(agent=chain_agent),
     ],
 )

@@ -6,6 +6,7 @@ import { Settings } from "./Settings";
 import { useBubbleView } from "../contexts/BubbleViewContext";
 import { Chats } from "./Chats";
 import { useChat } from "../contexts/ChatContext";
+import IconV2 from "../../../assets/icon_v2.png";
 
 export function Bubble() {
   const { currentView, setCurrentView } = useBubbleView();
@@ -98,7 +99,19 @@ export function Bubble() {
   return (
     <div className="bubble-container window" style={containerStyle}>
       <div className="app-drag title-bar">
-        <div className="title-bar-text">Chat with Klippy</div>
+        <div className="title-bar-text">
+          <img 
+            src={IconV2} 
+            alt="Klippy" 
+            style={{ 
+              width: "16px", 
+              height: "16px", 
+              marginRight: "6px", 
+              verticalAlign: "middle" 
+            }} 
+          />
+          Chat with Klippy
+        </div>
         <div className="title-bar-controls app-no-drag">
           <button
             style={{

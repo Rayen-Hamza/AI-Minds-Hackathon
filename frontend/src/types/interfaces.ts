@@ -3,6 +3,12 @@ export interface MessageRecord {
   content?: string;
   sender: "user" | "klippy";
   createdAt: number;
+  // New fields for agent response metadata
+  sourceFiles?: string[];
+  confidence?: number;
+  hasGraphReasoning?: boolean;
+  hasRagContext?: boolean;
+  entitiesFound?: string[];
 }
 
 export interface ChatRecord {

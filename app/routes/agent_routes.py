@@ -14,7 +14,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 
-from ..agents import root_agent, qdrant_agent, neo4j_agent
+from ..agents import root_agent, qdrant_agent, neo4j_agent, run_prompt_chain
 from ..memory import record_event, get_context
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,12 @@ class AgentResponse(BaseModel):
     agent: str
     success: bool
     error: Optional[str] = None
+    # New fields for prompt chain metadata
+    source_files: list[str] = []
+    confidence: Optional[float] = None
+    has_graph_reasoning: bool = False
+    has_rag_context: bool = False
+    entities_found: list[str] = []
 
 
 class SessionInfo(BaseModel):
@@ -172,11 +178,35 @@ async def chat_with_agent(request: AgentRequest):
             logger.warning(f"Failed to record memory event: {mem_err}")
             # Don't fail the request if memory recording fails
 
+        # Try to extract metadata from prompt chain if available
+        source_files = []
+        confidence = None
+        has_graph_reasoning = False
+        has_rag_context = False
+        entities_found = []
+
+        # Run prompt chain to get metadata (this enriches the response)
+        try:
+            chain_result = run_prompt_chain(request.message)
+            if chain_result.get("success"):
+                source_files = chain_result.get("source_files", [])
+                confidence = chain_result.get("confidence")
+                has_graph_reasoning = chain_result.get("has_reasoning", False)
+                has_rag_context = chain_result.get("has_rag", False)
+                entities_found = chain_result.get("entities_found", [])
+        except Exception as chain_error:
+            logger.debug(f"Prompt chain metadata extraction failed: {chain_error}")
+
         return AgentResponse(
             response=response_text,
             session_id=session_id,
             agent=agent.name,
             success=True,
+            source_files=source_files,
+            confidence=confidence,
+            has_graph_reasoning=has_graph_reasoning,
+            has_rag_context=has_rag_context,
+            entities_found=entities_found,
         )
 
     except Exception as e:
