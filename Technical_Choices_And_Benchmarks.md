@@ -299,7 +299,7 @@ Query: "What projects did I work on with Alex last year?"
 - **RAM:** 16GB DDR4-3600
 - **Storage:** NVMe SSD
 
-### Dataset: Personal Zettelkasten
+### Dataset: [Real Personal Zettelkasten](https://github.com/Ala-ADN/Zettelkasten)
 
 - **Total files:** 312
 - **Text files:** 247 (Markdown, TXT)
@@ -308,6 +308,8 @@ Query: "What projects did I work on with Alex last year?"
 - **Languages:** English (primary), French, Arabic (mixed)
 - **Topics:** Technology, hobbies, personal projects, learning notes
 - **Date range:** 2023–2026
+
+> 🔗 **Test corpus:** [github.com/Ala-ADN/Zettelkasten](https://github.com/Ala-ADN/Zettelkasten) — a real second-brain used for daily note-taking
 
 ---
 
@@ -327,6 +329,6 @@ Klippy achieves **production-grade performance** on consumer hardware through:
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Benchmarked%20on-Real%20Zettelkasten-success?style=for-the-badge"/>
+  <a href="https://github.com/Ala-ADN/Zettelkasten"><img src="https://img.shields.io/badge/Benchmarked%20on-Real%20Zettelkasten-success?style=for-the-badge"/></a>
   <img src="https://img.shields.io/badge/312%20Files-Tested-blue?style=for-the-badge"/>
 </p>
