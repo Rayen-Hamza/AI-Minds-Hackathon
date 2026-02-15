@@ -10,7 +10,82 @@ services:
     restart: unless-stopped
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - ai-minds-network
+
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: neo4j-graph-db
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/changeme
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+    networks:
+      - ai-minds-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-inference
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - ai-minds-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=changeme
+      - LLM_BASE_URL=http://ollama:11434/v1
+      - LLM_PROVIDER=ollama
+      - LLM_MODEL=qwen2.5:3b
+    depends_on:
+      - qdrant
+      - neo4j
+      - ollama
+    networks:
+      - ai-minds-network
 
 volumes:
   qdrant_data:
     driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  ollama_data:
+    driver: local
+
+networks:
+  ai-minds-network:
+    driver: bridge

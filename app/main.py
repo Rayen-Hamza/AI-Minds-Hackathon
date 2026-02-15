@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.services.storage import get_qdrant_manager
-from app.routes import ingest_router, search_router, admin_router
+from app.routes import ingest_router, search_router, admin_router, agent_router
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +134,7 @@ async def global_exception_handler(request, exc):
 app.include_router(admin_router)
 app.include_router(ingest_router)
 app.include_router(search_router)
+app.include_router(agent_router)
 
 
 @app.get("/")

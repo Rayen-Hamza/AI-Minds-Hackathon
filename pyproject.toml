@@ -25,6 +25,8 @@ dependencies = [
     "python-magic",
     "aiofiles",
     "sentencepiece>=0.2.1",
+    "google-adk[extensions]>=1.25.0",
+    "litellm>=1.80.16",
 ]
 
 [tool.uv.sources]

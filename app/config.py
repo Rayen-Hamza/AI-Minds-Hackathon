@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # LLM Configuration (Local or API)
+    llm_provider: str = "ollama"  # "ollama", "openai", or "gemini"
+    llm_model: str = "qwen2.5:3b"  # Model name for Ollama
+    llm_base_url: str = "http://localhost:11434/v1"  # Ollama OpenAI-compatible endpoint
+    llm_api_key: Optional[str] = None  # Not needed for Ollama
+
     # Neo4j (for future integration)
     neo4j_uri: Optional[str] = None
     neo4j_user: Optional[str] = None
