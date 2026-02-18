@@ -2,10 +2,6 @@
   <img src="frontend/assets/icon_v2.png" alt="Klippy" width="200"/>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/AI--Minds-Hackathon%202026-blueviolet?style=for-the-badge&logo=robot&logoColor=white" alt="AI Minds Hackathon"/>
-</p>
-
 <h1 align="center"> Klippy📎</h1>
 
 <p align="center">
@@ -169,8 +165,8 @@
 ### 1️⃣ Clone & Install
 
 ```bash
-git clone https://github.com/Rayen-Hamza/AI-Minds-Hackathon.git
-cd AI-Minds-Hackathon
+git clone https://github.com/Rayen-Hamza/Klippy.git
+cd Klippy
 
 # Install Python dependencies
 uv sync
@@ -272,7 +268,7 @@ uv run pytest tests/test_embeddings.py -v
 ## 📁 Project Structure
 
 ```
-AI-Minds-Hackathon/
+Klippy/
 ├── app/                          # FastAPI backend
 │   ├── agents/                   # Google ADK agents
 │   │   ├── orchestrator.py       # Root agent (router)
