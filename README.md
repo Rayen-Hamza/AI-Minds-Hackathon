@@ -344,9 +344,5 @@ MIT License ; see [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Made%20for-AI%20Minds%20Hackathon%202026-blueviolet?style=for-the-badge"/>
-</p>
-
-<p align="center">
   <sub>⭐ Star this repo if you find it useful!</sub>
 </p>
